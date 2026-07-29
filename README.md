@@ -1,38 +1,36 @@
-# 📊 ML Demand Forecasting
+# 📦 Demand Forecasting for Supply Chain
 
-[![CI/CD](https://github.com/twomathematicians-code/ml-demand-forecasting/actions/workflows/ci.yml/badge.svg)](https://github.com/twomathematicians-code/ml-demand-forecasting/actions)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://hub.docker.com/)
-[![XGBoost](https://img.shields.io/badge/XGBoost-Ready-3377B0)](https://xgboost.readthedocs.io/)
-
-**Production demand forecasting API: product demand, sales prediction, electricity price, and order volume — ensemble of LightGBM, Prophet, and statistical models with automated hyperparameter tuning.**
-
-## 🎯 Forecasting Modules
-
-| Module | Algorithm | Horizon |
-|---|---|---|
-| **Product Demand** | LightGBM + Feature Engineering | 30/60/90 day |
-| **Sales Prediction** | Prophet + Holiday Effects | Weekly/Monthly |
-| **Electricity Price** | XGBoost + Weather Features | 24h ahead |
-| **Order Volume** | Ensemble (LGBM + ARIMA) | Daily/Weekly |
-
-## 🚀 Quick Start
+> Prophet · LightGBM · SARIMA · Seasonal Decomposition
 
 ```bash
-git clone https://github.com/twomathematicians-code/ml-demand-forecasting.git
-cd ml-demand-forecasting
-docker-compose up --build
+docker compose up -d
+# API: http://localhost:8000/docs
 ```
 
-## 🔌 API Endpoints
+## What This Does
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/forecast/demand` | Product demand forecast |
-| `POST` | `/api/v1/forecast/sales` | Sales prediction |
-| `POST` | `/api/v1/forecast/electricity` | Electricity price forecast |
-| `POST` | `/api/v1/forecast/orders` | Order volume prediction |
-| `GET` | `/api/v1/health` | Health check |
+Predicts future demand for products, order volumes, and even electricity consumption.
 
-## 👤 Author
+| Forecast Type | Model | Use Case |
+|:--|:--|:--|
+| Product Demand | LightGBM + Prophet | Inventory planning |
+| Order Volume | SARIMA | Warehouse staffing |
+| Electricity | Ensemble | Energy procurement |
 
-**Mahesh Solanki** — [LinkedIn](https://linkedin.com/in/maheshsolanki-16b9a6a5) | [GitHub](https://github.com/twomathematicians-code)
+## Try It
+
+```bash
+# Demand forecast for a product
+curl -X POST http://localhost:8000/api/v1/forecast/demand -H "Content-Type: application/json" \
+  -d '{"product_id": "SKU-12345", "horizon_days": 30, "granularity": "daily"}'
+```
+
+## Endpoints
+
+- `POST /api/v1/forecast/demand` — Product demand prediction
+- `GET  /api/v1/forecast/orders` — Order volume forecast
+- `GET  /api/v1/forecast/electricity` — Energy demand forecast
+
+---
+
+<p><i>Mahesh Solanki · <a href="https://github.com/twomathematicians-code">GitHub</a></i></p>

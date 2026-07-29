@@ -1,4 +1,22 @@
-model:
-  random_state: 42
-  test_size: 0.2
-  cv_folds: 5
+demand:
+  default_horizon: 30
+  granularities: [daily, weekly, monthly]
+  confidence_level: 0.95
+
+models:
+  lightgbm:
+    n_estimators: 500
+    learning_rate: 0.05
+    max_depth: 8
+  prophet:
+    seasonality_mode: multiplicative
+    changepoint_range: 0.8
+  sarima:
+    order: [2, 1, 2]
+    seasonal_order: [1, 1, 1, 7]
+
+external_factors:
+  - weather
+  - promotions
+  - holidays
+  - competitor_pricing

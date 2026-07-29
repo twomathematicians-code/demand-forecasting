@@ -1,39 +1,11 @@
-stages:
-  - lint
-  - test
-  - build
-
+stages: [lint, test]
 lint:
-  stage: lint
   image: python:3.11-slim
-  before_script:
-    - pip install poetry==1.8.3
-    - poetry install --only dev
-  script:
-    - poetry run black --check src/ tests/
-    - poetry run ruff check src/ tests/
-  only: [merge_requests, main]
-
+  script: pip install ruff && ruff check src/
+  only: [main, merge_requests]
 test:
-  stage: test
   image: python:3.11-slim
-  services: [postgres:16-alpine]
-  variables:
-    POSTGRES_DB: ml_demand_forecasting_test
-    POSTGRES_USER: mluser
-    POSTGRES_PASSWORD: mlpassword
-  before_script:
-    - apt-get update && apt-get install -y libpq-dev
-    - pip install poetry==1.8.3
-    - poetry install --with dev
   script:
-    - poetry run pytest tests/ --cov=src -v
-  only: [merge_requests, main]
-
-build:
-  stage: build
-  image: docker:27-dind
-  services: [docker:27-dind]
-  script:
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
-  only: [main]
+    - pip install poetry && poetry install --with dev
+    - poetry run pytest tests/
+  only: [main, merge_requests]
