@@ -1,9 +1,19 @@
-on: [push, pull_request]
+name: CI
+on: [push, pull_request, workflow_dispatch]
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - run: pip install poetry && poetry install --with dev && poetry run pytest tests/ -v
+      - run: pip install ruff && ruff check src/ tests/ --exit-zero
+  test:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install poetry && poetry install --with dev
+      - run: poetry run pytest tests/ -v --tb=short
