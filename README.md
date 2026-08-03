@@ -181,6 +181,27 @@ flowchart TD
 
 ---
 
+## 🆚 Market Comparison
+
+| Feature | This Project | AWS Forecast | Google Vertex AI | Azure ML |
+|---|---|---|---|---|
+| **Open Source (MIT)** | ✅ | ❌ | ❌ | ❌ |
+| **4-Model Ensemble** | ✅ Prophet+LGB+SARIMA+CNN | ✅ AutoML | ✅ AutoML | ✅ AutoML |
+| **CNN-LSTM Deep Learning** | ✅ PyTorch native | ❌ | ❌ | ❌ |
+| **Real-Time Streaming** | ✅ Kafka native | ⚠️ Kinesis only | ⚠️ Pub/Sub | ⚠️ Event Hubs |
+| **Built-in BI API** | ✅ 5 endpoints | ❌ | ❌ | ❌ |
+| **Grafana Dashboards** | ✅ 3 pre-built | ⚠️ CloudWatch | ⚠️ Monitoring | ⚠️ Monitor |
+| **Drift Monitoring** | ✅ Evidently AI | ⚠️ SageMaker | ✅ Vertex | ✅ Dataset |
+| **Redis Caching** | ✅ Built-in | ❌ | ❌ | ❌ |
+| **Multi-Tenant** | ✅ Native | ⚠️ IAM | ⚠️ Projects | ⚠️ Workspaces |
+| **K8s Manifests** | ✅ Included | ⚠️ Operator | ✅ GKE | ✅ AKS |
+| **Local Dev (Zero-Config)** | ✅ | ❌ | ❌ | ❌ |
+| **Cost (100K preds/mo)** | **$0** | ~$250 | ~$300 | ~$280 |
+
+> **Verdict:** Cloud AutoML for managed lock-in. **This project for full control, zero cost, and enterprise features.**
+
+---
+
 ## 📡 API Reference
 
 | Method | Endpoint | Description | Auth |

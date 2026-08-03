@@ -26,6 +26,12 @@ from pydantic import BaseModel, Field
 
 from src.api.dashboard import router as dashboard_router
 from src.api.websocket import router as ws_router
+from src.api.middleware import (
+    RequestIDMiddleware,
+    RateLimitMiddleware,
+    StructuredLogMiddleware,
+    error_handler,
+)
 from src.cache.redis_cache import get_cache
 from src.pipelines.inference_pipeline import InferencePipeline
 from src.utils.config import get_app_config, get_settings
@@ -227,17 +233,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Demand Forecasting API",
-    version="3.0.0",
+    version="3.1.0",
     description="Production ML-powered demand forecasting with Prophet + LightGBM + SARIMA + CNN-LSTM ensemble. Redis caching, Kafka streaming, Grafana dashboards, and multi-tenant support.",
     lifespan=lifespan,
 )
 
+# Add production middlewares
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(StructuredLogMiddleware)
+app.add_middleware(RateLimitMiddleware, max_requests=200, window_seconds=60)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global exception handler
+app.add_exception_handler(Exception, error_handler)
 
 # Mount Phase 2 routers
 app.include_router(dashboard_router)
@@ -383,6 +396,57 @@ async def electricity_forecast(hours: int = Query(default=24, ge=1, le=168)):
 # ═══════════════════════════════════════════════════════════
 # System Endpoints
 # ═══════════════════════════════════════════════════════════
+
+@app.get("/api/v1/explain", tags=["System"])
+async def model_explainability(
+    product_id: str = Query(default="SKU-00001"),
+    horizon_days: int = Query(default=7, ge=1, le=30),
+):
+    """Return feature importance and model contribution breakdown.
+
+    Shows which features drove the forecast and each model's contribution
+    to the ensemble prediction.
+    """
+    try:
+        pipeline = get_pipeline()
+        result = pipeline.predict(product_id=product_id, horizon_days=horizon_days)
+
+        # Get LightGBM feature importance if available
+        feature_importance = []
+        importance_model = getattr(pipeline, "_ensemble", None)
+        if importance_model and hasattr(importance_model, "lightgbm"):
+            try:
+                fi = importance_model.lightgbm.feature_importance()
+                feature_importance = fi.head(15).to_dict(orient="records")
+            except Exception:
+                pass
+
+        # Model contributions from Ridge coefficients
+        model_contributions = {}
+        if importance_model and hasattr(importance_model, "meta_model") and importance_model.meta_model:
+            coefs = importance_model.meta_model.coef_
+            model_names = ["Prophet", "SARIMA", "LightGBM", "CNN-LSTM"]
+            model_contributions = {
+                name: round(float(c), 4)
+                for name, c in zip(model_names, coefs)
+            }
+
+        return {
+            "product_id": product_id,
+            "horizon_days": horizon_days,
+            "forecast_preview": result["forecast"][:3],
+            "model_contributions": model_contributions,
+            "top_features": feature_importance[:10] if feature_importance else [],
+            "trend": result["trend"],
+        }
+    except RuntimeError:
+        return {
+            "product_id": product_id,
+            "note": "Model not loaded. Feature importance unavailable.",
+            "model_contributions": {},
+            "top_features": [],
+        }
+
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["System"])
 async def health():
