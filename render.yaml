@@ -1,39 +1,11 @@
-# Render Blueprint — one-click deploy for demand-forecasting
-# After deploy: set matching passwords via Render Dashboard env vars
+# Render Blueprint — $0/month free tier deployment
+# Web service sleeps after 15min inactivity, wakes on next request
 
 services:
-  # ── PostgreSQL (TimescaleDB) ──
-  - type: pserv
-    name: demand-forecast-db
-    plan: starter
-    runtime: image
-    image:
-      url: timescale/timescaledb:latest-pg16
-    envVars:
-      - key: POSTGRES_DB
-        value: demand_forecasting
-      - key: POSTGRES_USER
-        value: mluser
-      - key: POSTGRES_PASSWORD
-        value: mlpassword123
-    disk:
-      name: pgdata
-      mountPath: /var/lib/postgresql/data
-      sizeGB: 10
-
-  # ── Redis ──
-  - type: redis
-    name: demand-forecast-redis
-    plan: free
-    ipAllowList:
-      - source: 0.0.0.0/0
-        description: Allow all
-
-  # ── FastAPI Web Service ──
   - type: web
     name: demand-forecast-api
     runtime: python
-    plan: starter
+    plan: free  # $0/month — 512MB RAM, 0.1 CPU
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
@@ -42,43 +14,16 @@ services:
         value: "3.11.0"
       - key: DF_ENVIRONMENT
         value: production
-      - key: DF_DB_HOST
-        fromService:
-          type: pserv
-          name: demand-forecast-db
-          property: host
-      - key: DF_DB_PORT
-        fromService:
-          type: pserv
-          name: demand-forecast-db
-          property: port
-      - key: DF_DB_USER
-        value: mluser
-      - key: DF_DB_NAME
-        value: demand_forecasting
-      - key: DF_DB_PASSWORD
-        value: mlpassword123
-      - key: DF_REDIS_URL
-        fromService:
-          type: redis
-          name: demand-forecast-redis
-          property: connectionString
+      - key: DF_MODEL_REGISTRY_PATH
+        value: /var/data/models
       - key: DF_REDIS_ENABLED
-        value: "true"
+        value: "false"
       - key: DF_KAFKA_CONSUMER_ENABLED
         value: "false"
       - key: DF_DRIFT_CHECK_ENABLED
         value: "false"
-      - key: DF_MODEL_REGISTRY_PATH
-        value: /var/data/models
       - key: DF_ADMIN_API_KEY
         value: admin-secret-change-me
-      - key: DF_KATZILLA_API_KEY
-        value: ""
-      - key: DF_CORS_ORIGINS
-        value: "https://demand-forecast-api.onrender.com"
-    disk:
-      name: model-storage
-      mountPath: /var/data
-      sizeGB: 5
+      - key: DF_DB_HOST
+        value: localhost
     autoDeploy: true
