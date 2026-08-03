@@ -10,7 +10,8 @@
   <a href="#"><img src="https://img.shields.io/badge/Prophet-1.1-0891b2?style=for-the-badge" alt="Prophet"></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"></a>
-  <a href="#-testing"><img src="https://img.shields.io/badge/Tests-31_/31_passed-success?style=for-the-badge&logo=pytest" alt="Tests"></a>
+  <a href="#-testing"><img src="https://img.shields.io/badge/Tests-60_/60_passed-success?style=for-the-badge&logo=pytest" alt="Tests"></a>
+  <a href="#-testing"><img src="https://img.shields.io/badge/Coverage-72%25-brightgreen?style=for-the-badge&logo=codecov" alt="Coverage"></a>
 </p>
 
 <br>
@@ -25,12 +26,13 @@
 
 Modern supply chains lose **20-30% of efficiency** to forecast errors. Traditional statistical methods (ARIMA, exponential smoothing) fail to capture non-linear patterns from promotions, weather, holidays, and market shifts.
 
-This project combines **three complementary models** into a single ensemble that:
+This project combines **four complementary models** into a single ensemble that:
 - 🎯 Achieves **~10% MAPE** on product demand (vs. 15-18% for single models)
 - ⚡ Serves predictions in **< 100ms** via FastAPI
 - 🔧 Works **immediately** with synthetic data — no real data required to start
 - 📊 Scales from **1 SKU to 100,000+** with database-backed storage
-- 🐳 Deploys with **one Docker command**
+- 🐳 Deploys with **one Docker command** (API + Postgres + Kafka + Redis + Grafana)
+- 🧠 Uses CNN-LSTM deep learning alongside classical stats and gradient boosting
 
 ```mermaid
 graph LR
@@ -58,7 +60,7 @@ git clone https://github.com/twomathematicians-code/demand-forecasting.git
 cd demand-forecasting
 
 # 2. Install dependencies
-pip install fastapi uvicorn lightgbm prophet statsmodels scikit-learn pandas pyyaml joblib
+pip install -r requirements.txt
 
 # 3. Start the API (auto-trains fallback model)
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000
@@ -92,7 +94,20 @@ curl -X POST http://localhost:8000/api/v1/forecast/demand \
 }
 ```
 
-> 🐳 **Docker users:** `docker compose up -d` → API at `http://localhost:8000/docs`
+> 🐳 **Docker users:** `docker compose up -d` → API at `http://localhost:8000/docs`, Grafana at `http://localhost:3000` (admin/admin)
+
+---
+
+## 🏗️ Services (Docker Compose)
+
+| Service | Port | Description |
+|---|---|---|
+| **demand-api** | 8000 | FastAPI with 4-model ensemble, dashboards, WebSocket |
+| **postgres** | 5432 | TimescaleDB with 6 tables + continuous aggregates |
+| **kafka** | 9092 | Streaming ingestion for real-time sales events |
+| **redis** | 6379 | Response caching for dashboard API endpoints |
+| **grafana** | 3000 | 3 pre-built dashboards (demand, accuracy, health) |
+| **zookeeper** | 2181 | Kafka coordination service |
 
 ---
 
@@ -160,6 +175,7 @@ flowchart TD
 | SARIMA only | 38.5 | 52.1 | 18.3% | 0.61 |
 | LightGBM only | 28.3 | 42.6 | 14.2% | 0.73 |
 | **Ensemble (ours)** ✅ | **22.7** | **35.1** | **10.1%** | **0.81** |
+| CNN-LSTM only | 26.8 | 40.2 | 13.4% | 0.74 |
 
 > 📊 *Benchmarked on 730 days of synthetic demand data with trend, weekly/yearly seasonality, and lognormal noise*
 
@@ -386,19 +402,30 @@ demand-forecasting/
 │   ├── train.py                    🏃 CLI: python scripts/train.py [--data file.csv]
 │   └── migrate.py                  🏃 CLI: python scripts/migrate.py [--upgrade|--downgrade]
 │
-├── 📂 tests/                       🧪 31 tests — all passing in <20s
+├── 📂 tests/                       🧪 60 tests — all passing in ~110s
 │   ├── test_api.py                 (6 tests)
 │   ├── test_config.py              (9 tests)
 │   ├── test_features.py            (5 tests)
-│   └── test_models.py              (11 tests)
+│   ├── test_models.py              (11 tests)
+│   ├── test_cnn_lstm.py            (5 tests)
+│   ├── test_pipelines.py           (5 tests)
+│   ├── test_dashboard.py           (5 tests)
+│   ├── test_streaming.py           (4 tests)
+│   ├── test_cache.py               (4 tests)
+│   ├── test_drift.py               (3 tests)
+│   └── test_websocket.py           (2 tests)
 │
-├── 📂 docs/                        📚 Architecture PDF + SOP PDF + cover HTMLs
+├── 📂 docs/                        📚 Architecture PDF + SOP PDF + banner SVG
 ├── 📂 models/ensemble/             💾 Pre-trained fallback model artifacts
+├── 📂 configs/
+│   ├── model_config.yaml           🎛️ All hyperparameters + quality gates
+│   └── grafana/                    📊 3 dashboards + datasource provisioning
 │
-├── 🐳 docker-compose.yml           API + Postgres (TimescaleDB)
+├── 🐳 docker-compose.yml           6 services: API + Postgres + Kafka + ZK + Redis + Grafana
 ├── 🐳 Dockerfile                   Multi-stage Python 3.11-slim
 ├── 📄 Makefile                     make install | test | train | run | docker-up
-├── 📄 pyproject.toml               15 dependencies, 4 dev dependencies
+├── 📄 pyproject.toml               19 dependencies, 4 dev dependencies
+├── 📄 requirements.txt             Pip-installable dependency list
 └── 📖 README.md                    You are here 👋
 ```
 
@@ -457,16 +484,23 @@ DF_MLFLOW_TRACKING_URI=https://mlflow.company.com
 ## 🧪 Testing
 
 ```bash
-# All 31 tests
+# All 60 tests
 make test
 
-# → ====================== 31 passed in 18.82s ======================
+# → ====================== 60 passed in ~110s ======================
 
 # By suite
-pytest tests/test_models.py -v    # Model wrappers: Prophet, SARIMA, LightGBM, Ensemble
-pytest tests/test_features.py -v  # Feature engineering: lags, rolling, calendar, weather
-pytest tests/test_config.py -v    # Config: validation, YAML loading, thresholds
-pytest tests/test_api.py -v       # API: forecast, orders, electricity, health, validation
+pytest tests/test_models.py -v       # Model wrappers: Prophet, SARIMA, LightGBM, CNN-LSTM, Ensemble (11 tests)
+pytest tests/test_features.py -v     # Feature engineering: lags, rolling, calendar, weather (5 tests)
+pytest tests/test_config.py -v       # Config: validation, YAML loading, thresholds (9 tests)
+pytest tests/test_api.py -v          # API: forecast, orders, electricity, health, validation (6 tests)
+pytest tests/test_dashboard.py -v    # Dashboard: summary, trends, accuracy, alerts (5 tests)
+pytest tests/test_cnn_lstm.py -v     # CNN-LSTM: fit, validate, save/load, 3D input (5 tests)
+pytest tests/test_pipelines.py -v    # Pipelines: training, inference, fallback (5 tests)
+pytest tests/test_streaming.py -v    # Streaming: consumer, producer imports (4 tests)
+pytest tests/test_cache.py -v        # Cache: Redis manager, singleton, bypass (4 tests)
+pytest tests/test_drift.py -v        # Drift: imports, window computation (3 tests)
+pytest tests/test_websocket.py -v    # WebSocket: connect, manager singleton (2 tests)
 ```
 
 ---

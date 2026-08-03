@@ -214,7 +214,7 @@ def sop_section(sop_id, title, body_paras, subsections=None):
 # ═══════════════════════════════════════════════════════════════
 
 def build_body():
-    output_path = os.path.join(os.path.dirname(__file__), 'doc2_body.pdf')
+    output_path = os.path.join(os.path.dirname(__file__), 'SOP_Demand_Forecasting_ML_Development.pdf')
     doc = TocDocTemplate(
         output_path, pagesize=A4,
         leftMargin=MARGIN, rightMargin=MARGIN,
@@ -229,7 +229,7 @@ def build_body():
     story.append(Paragraph('<b>STANDARD OPERATING PROCEDURE</b>', styles['sop_header']))
     story.append(Paragraph('Demand Forecasting ML Development Lifecycle', styles['title']))
     story.append(Paragraph(
-        'Document Version: 1.0 | Effective Date: August 2026 | Owner: Data Science Team | Classification: Internal',
+        'Document Version: 3.0.0 | Effective Date: August 2026 | Owner: Data Science Team | Classification: Internal',
         styles['caption']
     ))
     story.append(hr())
@@ -423,7 +423,42 @@ def build_body():
             ['Container Orchestration', 'Kubernetes', 'Docker Swarm (small deployments)'],
             ['Secrets Management', 'HashiCorp Vault', 'AWS Secrets Manager, Azure Key Vault'],
             ['Code Quality', 'Ruff + Black', 'pylint + flake8'],
+            ['Streaming Platform', 'Apache Kafka', 'Redpanda, RabbitMQ'],
+            ['Caching / Session Store', 'Redis', 'Memcached'],
+            ['Monitoring Dashboards', 'Grafana', 'Datadog, New Relic'],
+            ['Real-time Communication', 'WebSocket (FastAPI)', 'SSE (Server-Sent Events)'],
+            ['Local Orchestration', 'Docker Compose', 'Podman Compose'],
         ]),
+    ]))
+
+    # ═══════════════════════════════════════════════════════
+    # SOP-10
+    # ═══════════════════════════════════════════════════════
+    story.append(PageBreak())
+    story.extend(sop_section('SOP-10', 'Streaming Data Ingestion & Real-Time Processing', [
+        'Define procedures for ingesting, validating, and processing real-time demand data streams.',
+        'Configure Kafka topics per data source (sales.events, inventory.updates, external.weather, external.promotions) with appropriate partition counts based on throughput.',
+        'Implement schema validation using Avro/JSON Schema in the Kafka producer. Reject malformed messages to a dead-letter queue (DLQ) topic.',
+        'Deploy the aiokafka consumer as a FastAPI lifespan background task with batch upserts (100 records or 5-second flush) to the actuals table.',
+        'Configure idempotent producers (enable_idempotence=True) and manual commits (enable_auto_commit=False) for exactly-once semantics.',
+        'Monitor consumer lag using Kafka\'s built-in metrics. Alert when lag exceeds 1000 messages or 60 seconds.',
+        'Test the full stream end-to-end: produce test events, verify they appear in the actuals table within 10 seconds.',
+        'Streaming topology document, topic registry, consumer lag monitoring dashboard.',
+    ]))
+
+    # ═══════════════════════════════════════════════════════
+    # SOP-11
+    # ═══════════════════════════════════════════════════════
+    story.append(PageBreak())
+    story.extend(sop_section('SOP-11', 'Production Monitoring & Observability', [
+        'Maintain full observability of ML models and infrastructure in production.',
+        'Deploy Grafana dashboards (demand-overview, forecast-accuracy, model-health) via docker-compose provisioning. Verify all panels render with live data.',
+        'Configure Evidently AI drift checks via APScheduler (daily at 06:00). Store results in drift_metrics table and auto-create alerts for detected drift.',
+        'Set up WebSocket heartbeat (30-second interval) for real-time dashboard connections. Monitor active connection count.',
+        'Enable Redis caching for dashboard API endpoints with configurable TTL. Monitor cache hit rate — target >80%.',
+        'Configure multi-tenant isolation: verify tenant_id is propagated through all queries. Test cross-tenant data isolation by querying as different tenants.',
+        'Review monitoring dashboards weekly: check for accuracy degradation, drift patterns, and resource utilization trends.',
+        'Operational runbook, monitoring dashboard URLs, alert escalation matrix.',
     ]))
 
     # ═══════════════════════════════════════════════════════
@@ -516,7 +551,7 @@ def build_body():
     story.append(Spacer(1, 20))
     story.append(hr())
     story.append(Paragraph(
-        '<i>End of Document | SOP Version 1.0 | August 2026 | '
+        '<i>End of Document | SOP Version 3.0.0 | August 2026 | '
         'Next Review Date: February 2027 | Document Owner: Data Science Team Lead</i>',
         styles['footer']
     ))

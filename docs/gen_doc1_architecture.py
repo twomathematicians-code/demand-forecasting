@@ -234,7 +234,7 @@ def callout_row(values_labels):
 # ═══════════════════════════════════════════════════════════════
 
 def build_body():
-    output_path = os.path.join(os.path.dirname(__file__), 'doc1_body.pdf')
+    output_path = os.path.join(os.path.dirname(__file__), 'Client_Requirements_Technical_Architecture.pdf')
     doc = TocDocTemplate(
         output_path, pagesize=A4,
         leftMargin=MARGIN, rightMargin=MARGIN,
@@ -582,9 +582,200 @@ def build_body():
     story.append(Paragraph('<i>Figure 2: Layered system architecture overview</i>', styles['caption']))
 
     # ═══════════════════════════════════════════════════════
-    # 6. TECHNOLOGY STACK
+    # 6. PHASE 2 ADDITIONS
     # ═══════════════════════════════════════════════════════
-    story.append(add_heading('6. Technology Stack Summary', styles['h1'], level=0))
+    story.append(PageBreak())
+    story.append(add_heading('6. Phase 2 Additions', styles['h1'], level=0))
+    story.append(hr())
+
+    story.append(Paragraph(
+        'Phase 2 extends the platform with advanced deep learning capabilities, real-time '
+        'streaming ingestion, business intelligence APIs, model monitoring, and WebSocket-based '
+        'live updates. These additions transform the platform from a batch forecasting system '
+        'into a real-time, interactive decision-support platform.',
+        styles['body']
+    ))
+
+    story.append(add_heading('6.1 CNN-LSTM Deep Learning Model', styles['h2'], level=1))
+    story.append(Paragraph(
+        'The CNN-LSTM hybrid architecture is the core deep learning model deployed in Phase 2. '
+        'Convolutional layers extract local temporal patterns (short-term trends, daily cycles), '
+        'while bidirectional LSTM layers capture long-range dependencies spanning multiple weeks '
+        'or months. The model processes multivariate input sequences including historical demand, '
+        'weather features, calendar encodings, and cluster labels.',
+        styles['body']
+    ))
+    story.append(bullet('<b>Input Window:</b> 60-90 day sliding windows with 14 exogenous feature channels'))
+    story.append(bullet('<b>Architecture:</b> Conv1D(64,3) to Conv1D(128,3) to MaxPool1D(2) to BiLSTM(128) to BiLSTM(64) to Dense(32) to Output'))
+    story.append(bullet('<b>Training:</b> Adam optimizer (lr=0.001), ReduceLROnPlateau scheduler (factor=0.5, patience=10), EarlyStopping (patience=20), batch size 64'))
+    story.append(bullet('<b>Hyperparameter Tuning:</b> Optuna with TPE sampler across 100 trials, optimizing for validation MAPE'))
+    story.append(bullet('<b>Model Registry:</b> Versioned in MLflow Model Registry with automated stage transitions (Staging to Production to Archived) based on evaluation metrics'))
+
+    story.append(add_heading('6.2 Kafka Streaming Ingestion', styles['h2'], level=1))
+    story.append(Paragraph(
+        'Real-time data ingestion is powered by Apache Kafka, replacing batch-only data pipelines '
+        'with continuous streaming. This enables the platform to process live IoT meter readings, '
+        'POS transactions, and ERP updates as they occur, reducing data latency from hours to seconds.',
+        styles['body']
+    ))
+    story.append(make_table(
+        ['Component', 'Technology', 'Details'],
+        [
+            ['Message Broker', 'Apache Kafka 3.6+', 'Multi-broker cluster with KRaft consensus, 3+ brokers for HA'],
+            ['Topics', 'demand.raw, demand.features, demand.predictions', 'Partitioned by region + product category for parallelism'],
+            ['Schema Registry', 'Confluent Schema Registry', 'Avro schemas with full backward/forward compatibility'],
+            ['Stream Processing', 'Kafka Streams + Faust', 'Windowed aggregations (5-min, 1-hr, 1-day), real-time feature computation'],
+            ['Connectors', 'Kafka Connect', 'Debezium CDC from PostgreSQL, HTTP Sink for API, S3 Sink for data lake'],
+            ['Monitoring', 'Lag Exporter + Prometheus', 'Consumer lag alerts, throughput dashboards, partition health'],
+        ],
+        [AVAILABLE_W * 0.20, AVAILABLE_W * 0.28, AVAILABLE_W * 0.52]
+    ))
+
+    story.append(add_heading('6.3 BI Dashboard API Routes', styles['h2'], level=1))
+    story.append(Paragraph(
+        'A comprehensive REST API layer exposes forecasting data, cluster analytics, and '
+        'business intelligence metrics to frontend dashboards and external BI tools. All '
+        'endpoints are documented via OpenAPI 3.0 and include role-based access control.',
+        styles['body']
+    ))
+    story.append(make_table(
+        ['Endpoint Group', 'Routes', 'Purpose'],
+        [
+            ['Forecasts', 'GET /api/v2/forecasts, POST /api/v2/forecasts/refresh', 'Retrieve horizon-specific predictions, trigger on-demand forecast refresh'],
+            ['Clusters', 'GET /api/v2/clusters, GET /api/v2/clusters/{id}/members', 'Demand pattern clusters, cluster composition, inter-cluster migration'],
+            ['Metrics', 'GET /api/v2/metrics/accuracy, GET /api/v2/metrics/drift', 'MAPE/WMAPE by horizon and category, drift monitoring KPIs'],
+            ['Scenarios', 'POST /api/v2/scenarios/what-if', 'Submit what-if parameters, retrieve scenario comparison results'],
+            ['Alerts', 'GET /api/v2/alerts, PUT /api/v2/alerts/{id}/acknowledge', 'Active alerts, alert history, acknowledgement workflow'],
+            ['Exports', 'GET /api/v2/exports/{format}', 'CSV/Excel/Parquet export of forecasts, metrics, and cluster assignments'],
+        ],
+        [AVAILABLE_W * 0.18, AVAILABLE_W * 0.40, AVAILABLE_W * 0.42]
+    ))
+
+    story.append(add_heading('6.4 Evidently AI Drift Monitoring', styles['h2'], level=1))
+    story.append(Paragraph(
+        'Evidently AI is integrated for continuous model monitoring, providing automated detection '
+        'of data drift, concept drift, and model performance degradation. Drift reports are '
+        'generated on a scheduled basis and on-demand, with automated alerts when thresholds '
+        'are breached.',
+        styles['body']
+    ))
+    story.append(bullet('<b>Data Drift:</b> Population Stability Index (PSI) on all input features. Alert threshold: PSI &gt; 0.25 on any key feature'))
+    story.append(bullet('<b>Concept Drift:</b> Rolling MAPE tracking with 30-day windows. Alert when MAPE exceeds baseline by &gt;20% for 3 consecutive windows'))
+    story.append(bullet('<b>Target Drift:</b> Distribution comparison of prediction targets using Wasserstein distance'))
+    story.append(bullet('<b>Report Generation:</b> HTML/JSON drift reports auto-generated weekly and stored in MLflow artifacts'))
+    story.append(bullet('<b>Automated Response:</b> Drift alerts trigger MLflow webhooks that can initiate automated retraining pipelines via Airflow'))
+
+    story.append(add_heading('6.5 WebSocket Real-Time Updates', styles['h2'], level=1))
+    story.append(Paragraph(
+        'WebSocket connections enable real-time push of forecast updates, anomaly alerts, '
+        'and streaming metrics to BI dashboards without polling. This is critical for '
+        'operational teams that need sub-second awareness of demand shifts.',
+        styles['body']
+    ))
+    story.append(bullet('<b>Channels:</b> /ws/forecasts (live prediction updates), /ws/alerts (real-time anomaly notifications), /ws/metrics (streaming accuracy KPIs)'))
+    story.append(bullet('<b>Protocol:</b> WSS (secure WebSocket) with JWT token authentication on connection upgrade'))
+    story.append(bullet('<b>Fallback:</b> Server-Sent Events (SSE) for environments where WebSocket is blocked by network policy'))
+    story.append(bullet('<b>Client Libraries:</b> JavaScript SDK and Python client provided for dashboard and ERP integration'))
+    story.append(bullet('<b>Throughput:</b> Designed for 10,000+ concurrent connections with Redis pub/sub backend for horizontal scaling'))
+
+    # ═══════════════════════════════════════════════════════
+    # 7. PHASE 3 ADDITIONS
+    # ═══════════════════════════════════════════════════════
+    story.append(PageBreak())
+    story.append(add_heading('7. Phase 3 Additions', styles['h1'], level=0))
+    story.append(hr())
+
+    story.append(Paragraph(
+        'Phase 3 hardens the platform for production at scale with Redis caching for '
+        'low-latency inference, Grafana observability dashboards, multi-tenant isolation, '
+        'and hardened CI/CD pipelines. These additions ensure the platform meets enterprise '
+        'requirements for reliability, security, and operational excellence.',
+        styles['body']
+    ))
+
+    story.append(add_heading('7.1 Redis Caching Layer', styles['h2'], level=1))
+    story.append(Paragraph(
+        'A Redis caching layer is introduced to reduce inference latency and database load '
+        'for frequently accessed forecasts, cluster assignments, and dashboard queries. Redis '
+        'operates as both a read-through cache and a pub/sub message bus for real-time updates.',
+        styles['body']
+    ))
+    story.append(make_table(
+        ['Cache Strategy', 'TTL', 'Use Case'],
+        [
+            ['Forecast Cache', '15 minutes', 'Pre-computed predictions for dashboard and API consumption'],
+            ['Feature Cache', '1 hour', 'Latest feature vectors for real-time inference, reducing Feast round-trips'],
+            ['Cluster Cache', '24 hours', 'Cluster assignments and centroids, invalidated on retraining'],
+            ['Session Cache', '30 minutes', 'User session state for BI dashboard, role-based view preferences'],
+            ['Rate Limiter', 'Per-second window', 'Token bucket rate limiting for API endpoints, preventing abuse'],
+        ],
+        [AVAILABLE_W * 0.25, AVAILABLE_W * 0.18, AVAILABLE_W * 0.57]
+    ))
+    story.append(bullet('<b>Deployment:</b> Redis Cluster with 3 primary + 3 replica nodes, automatic failover via Redis Sentinel'))
+    story.append(bullet('<b>Cache Warming:</b> Scheduled cache warming on model deployment and retraining events'))
+    story.append(bullet('<b>Eviction Policy:</b> volatile-lru for forecast/feature caches, preserving session data under memory pressure'))
+
+    story.append(add_heading('7.2 Grafana Observability Dashboards', styles['h2'], level=1))
+    story.append(Paragraph(
+        'Grafana provides a unified observability layer with dedicated dashboards for '
+        'model performance, infrastructure health, business metrics, and streaming data '
+        'pipeline monitoring. All dashboards are provisioned as code for reproducibility.',
+        styles['body']
+    ))
+    story.append(make_table(
+        ['Dashboard', 'Data Sources', 'Key Panels'],
+        [
+            ['Model Performance', 'Prometheus + MLflow', 'MAPE/WMAPE by model version, drift indicators, retraining events, A/B test results'],
+            ['Infrastructure Health', 'Prometheus + Node Exporter', 'CPU/Memory/Disk per service, Kafka consumer lag, API latency percentiles (p50/p95/p99)'],
+            ['Business Impact', 'PostgreSQL + Prometheus', 'Revenue-at-risk from forecast error, stockout events avoided, capacity utilization'],
+            ['Pipeline Monitoring', 'Airflow + Prometheus', 'DAG run status, task duration trends, data quality check pass/fail rates'],
+            ['Streaming Health', 'Kafka + Prometheus', 'Messages per second, end-to-end latency, partition skew, consumer group status'],
+        ],
+        [AVAILABLE_W * 0.22, AVAILABLE_W * 0.28, AVAILABLE_W * 0.50]
+    ))
+    story.append(bullet('<b>Alerting:</b> Grafana Alertmanager integrated with Slack, Email, and PagerDuty for critical incidents'))
+    story.append(bullet('<b>Provisioning:</b> All dashboards, datasources, and alert rules defined in YAML and version-controlled in Git'))
+
+    story.append(add_heading('7.3 Multi-Tenant Support', styles['h2'], level=1))
+    story.append(Paragraph(
+        'Multi-tenant architecture enables the platform to serve multiple client organizations '
+        'with strict data isolation, independent model configurations, and tenant-specific '
+        'feature engineering. Each tenant operates within its own logical partition while '
+        'sharing common infrastructure.',
+        styles['body']
+    ))
+    story.append(bullet('<b>Isolation Model:</b> Database-per-tenant for forecast data, schema-per-tenant for shared PostgreSQL instances'))
+    story.append(bullet('<b>Tenant Context:</b> JWT claims carry tenant_id, enforced at API gateway and database query layer'))
+    story.append(bullet('<b>Model Per Tenant:</b> Each tenant gets dedicated model versions with tenant-specific features and retraining schedules'))
+    story.append(bullet('<b>Resource Quotas:</b> CPU/memory limits per tenant namespace in Kubernetes, API rate limits via Redis token bucket'))
+    story.append(bullet('<b>Billing Integration:</b> Usage metrics (API calls, forecast volume, storage) exported to billing system via webhook'))
+
+    story.append(add_heading('7.4 CI/CD Hardening', styles['h2'], level=1))
+    story.append(Paragraph(
+        'Phase 3 tightens the CI/CD pipeline with enhanced security scanning, automated '
+        'rollback capabilities, deployment strategies, and compliance checks. Every code '
+        'change and model update follows a gated promotion path from development through '
+        'staging to production.',
+        styles['body']
+    ))
+    story.append(make_table(
+        ['Hardening Area', 'Tool/Practice', 'Implementation'],
+        [
+            ['SAST', 'SonarQube / Bandit', 'Static code analysis on every PR, blocking merge on critical/blocker issues'],
+            ['Dependency Scan', 'Dependabot / Snyk', 'Automated vulnerability scanning of Python, npm, and container dependencies'],
+            ['Container Signing', 'Cosign / Notary', 'Image signing and verification before Kubernetes admission'],
+            ['Deployment Strategy', 'Argo Rollouts (Blue/Green)', 'Gradual traffic shifting with automated health checks and rollback triggers'],
+            ['Secrets Management', 'HashiCorp Vault', 'Dynamic secrets, encryption as a service, audit logging for all secret access'],
+            ['Compliance', 'Open Policy Agent (OPA)', 'Policy-as-code for infrastructure, ensuring SOC 2 and GDPR compliance gates'],
+            ['Model Validation', 'Automated A/B Test Gates', 'Champion/challenger framework: new model must beat baseline by &gt;5% MAPE for 7 consecutive days before promotion'],
+        ],
+        [AVAILABLE_W * 0.20, AVAILABLE_W * 0.28, AVAILABLE_W * 0.52]
+    ))
+
+    # ═══════════════════════════════════════════════════════
+    # 8. TECHNOLOGY STACK
+    # ═══════════════════════════════════════════════════════
+    story.append(add_heading('8. Technology Stack Summary', styles['h1'], level=0))
     story.append(hr())
     story.append(make_table(
         ['Capability', 'Primary Technology', 'Alternative'],
@@ -607,27 +798,25 @@ def build_body():
     ))
 
     # ═══════════════════════════════════════════════════════
-    # 7. IMPLEMENTATION ROADMAP
+    # 9. IMPLEMENTATION ROADMAP
     # ═══════════════════════════════════════════════════════
-    story.append(add_heading('7. Implementation Roadmap', styles['h1'], level=0))
+    story.append(add_heading('9. Implementation Roadmap', styles['h1'], level=0))
     story.append(hr())
     story.append(make_table(
-        ['Phase', 'Duration', 'Key Deliverables'],
+        ['Phase', 'Duration', 'Status', 'Key Deliverables'],
         [
-            ['Phase 1: Foundation', 'Weeks 1-4', 'Data pipeline construction, weather API integration, basic Prophet & LightGBM models, baseline evaluation'],
-            ['Phase 2: Deep Learning', 'Weeks 5-8', 'CNN-LSTM implementation, hyperparameter tuning with Optuna, model evaluation against baselines, MLflow experiment tracking'],
-            ['Phase 3: Clustering & BI', 'Weeks 9-12', 'DBSCAN/K-Means industry clustering, Kafka streaming pipeline, Streamlit BI dashboards, what-if scenario engine'],
-            ['Phase 4: MLOps', 'Weeks 13-16', 'Feast feature store, Evidently drift monitoring, Airflow orchestration, CI/CD pipelines, automated retraining triggers'],
-            ['Phase 5: Production', 'Weeks 17-20', 'Load testing, security audit, A/B champion/challenger deployment, production cutover, user training & documentation'],
+            ['Phase 1: Foundation', 'Weeks 1-8', 'Complete', 'Data pipeline construction, weather API integration, Prophet/LightGBM/SARIMAX models, CNN-LSTM implementation, DBSCAN/K-Means clustering, baseline evaluation, MLflow experiment tracking'],
+            ['Phase 2: Real-Time & MLOps', 'Weeks 9-16', 'Complete', 'Kafka streaming pipeline, BI dashboard API routes, Evidently AI drift monitoring, WebSocket real-time updates, Feast feature store, Airflow orchestration, CI/CD pipelines'],
+            ['Phase 3: Production Hardening', 'Weeks 17-24', 'Complete', 'Redis caching layer, Grafana observability dashboards, multi-tenant support, CI/CD hardening (SAST, container signing, secrets management), load testing, security audit, A/B champion/challenger deployment, user training'],
         ],
-        [AVAILABLE_W * 0.20, AVAILABLE_W * 0.15, AVAILABLE_W * 0.65]
+        [AVAILABLE_W * 0.20, AVAILABLE_W * 0.12, AVAILABLE_W * 0.10, AVAILABLE_W * 0.58]
     ))
 
     # ═══════════════════════════════════════════════════════
-    # 8. APPENDIX: CNN-LSTM REFERENCE ARCHITECTURE
+    # 10. APPENDIX: CNN-LSTM REFERENCE ARCHITECTURE
     # ═══════════════════════════════════════════════════════
     story.append(PageBreak())
-    story.append(add_heading('8. Appendix: CNN-BiLSTM Architecture Reference', styles['h1'], level=0))
+    story.append(add_heading('10. Appendix: CNN-BiLSTM Architecture Reference', styles['h1'], level=0))
     story.append(hr())
     story.append(Paragraph(
         'The following is the reference PyTorch implementation for the CNN-BiLSTM hybrid model:',
@@ -674,7 +863,7 @@ def build_body():
     story.append(Spacer(1, 20))
     story.append(hr())
     story.append(Paragraph(
-        '<i>Document Version 1.0 | August 2026 | Prepared by Mahesh Solanki | '
+        '<i>Document Version 3.0.0 | August 2026 | Prepared by Mahesh Solanki | '
         'Confidential — For Client Review Only</i>',
         ParagraphStyle('Footer', fontName='TimesNewRoman-Italic', fontSize=8, leading=12,
                        textColor=TEXT_MUTED, alignment=TA_CENTER)

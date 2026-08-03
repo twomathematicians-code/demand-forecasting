@@ -67,7 +67,7 @@
 
   <!-- Subtitle -->
   <text x="80" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="400" fill="#707090">
-    Prophet + LightGBM + SARIMA Ensemble • Production-Grade ML • Deploy in 30 Seconds
+    Prophet + LightGBM + SARIMA + CNN-LSTM • Redis • Kafka • Grafana • Multi-Tenant • v3.0
   </text>
 
   <!-- Right side: Three model icons -->

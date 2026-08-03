@@ -227,8 +227,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Demand Forecasting API",
-    version="2.1.0",
-    description="Production ML-powered demand forecasting with Prophet + LightGBM + SARIMA ensemble",
+    version="3.0.0",
+    description="Production ML-powered demand forecasting with Prophet + LightGBM + SARIMA + CNN-LSTM ensemble. Redis caching, Kafka streaming, Grafana dashboards, and multi-tenant support.",
     lifespan=lifespan,
 )
 
