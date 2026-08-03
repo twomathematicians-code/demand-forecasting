@@ -1,0 +1,65 @@
+{
+  "title": "Model Health & Drift",
+  "tags": ["demand-forecasting", "phase-3"],
+  "refresh": "1h",
+  "time": {"from": "now-30d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Drift Detected (per feature)",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT check_timestamp AS time, feature_name, drift_score FROM drift_metrics WHERE model_id = 1 AND drift_detected = TRUE ORDER BY check_timestamp",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Active Alerts",
+      "type": "table",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT created_at AS time, alert_type, severity, message FROM alerts WHERE acknowledged = FALSE ORDER BY created_at DESC LIMIT 20",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Active Models",
+      "type": "table",
+      "gridPos": {"x": 0, "y": 7, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT model_name, model_type, model_version, status, created_at FROM model_metadata ORDER BY created_at DESC LIMIT 5",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Latest Model Metrics",
+      "type": "stat",
+      "gridPos": {"x": 12, "y": 7, "w": 6, "h": 3},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT training_metrics->>'mape' AS mape FROM model_metadata WHERE status = 'active' ORDER BY created_at DESC LIMIT 1",
+        "format": "table"
+      }],
+      "fieldConfig": {"defaults": {"unit": "percent"}}
+    },
+    {
+      "id": 5,
+      "title": "R²",
+      "type": "stat",
+      "gridPos": {"x": 18, "y": 7, "w": 6, "h": 3},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT training_metrics->>'r2' AS r2 FROM model_metadata WHERE status = 'active' ORDER BY created_at DESC LIMIT 1",
+        "format": "table"
+      }],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+    }
+  ]
+}

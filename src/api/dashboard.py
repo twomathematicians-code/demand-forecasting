@@ -20,6 +20,7 @@ from src.db.queries import (
     GET_ACTIVE_ALERTS,
 )
 from src.db.session import get_connection
+from src.cache.redis_cache import cached
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["📊 Dashboard"])
 log = logging.getLogger(__name__)

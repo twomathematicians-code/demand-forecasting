@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from src.api.dashboard import router as dashboard_router
 from src.api.websocket import router as ws_router
+from src.cache.redis_cache import get_cache
 from src.pipelines.inference_pipeline import InferencePipeline
 from src.utils.config import get_app_config, get_settings
 from src.utils.logging import setup_logging
@@ -167,6 +168,12 @@ async def lifespan(app: FastAPI):
         )
         log.info("Kafka consumer started on %s", settings.kafka_sales_topic)
 
+    # ── Redis Cache (Phase 3) ──
+    if settings.redis_enabled:
+        cache = get_cache()
+        await cache.connect()
+        log.info("Redis cache ready: %s", settings.redis_url)
+
     # ── Drift Scheduler (Phase 2) ──
     scheduler = None
     if settings.drift_check_enabled:
@@ -209,6 +216,8 @@ async def lifespan(app: FastAPI):
             pass
     if scheduler is not None:
         scheduler.shutdown(wait=False)
+    if settings.redis_enabled:
+        await get_cache().disconnect()
     _pipeline = None
 
 

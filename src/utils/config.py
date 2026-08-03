@@ -307,6 +307,13 @@ class Settings(BaseSettings):
     drift_reference_days: int = Field(90, ge=30, le=365)
     drift_current_days: int = Field(30, ge=7, le=90)
 
+    # ── Redis ──
+    redis_url: str = "redis://localhost:6379/0"
+    redis_enabled: bool = False
+
+    # ── Multi-Tenant ──
+    tenant_id: str = "default"
+
     @property
     def database_url(self) -> str:
         """Build an asyncpg-compatible database URL."""

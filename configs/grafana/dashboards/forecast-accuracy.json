@@ -1,0 +1,56 @@
+{
+  "title": "Forecast Accuracy",
+  "tags": ["demand-forecasting", "phase-3"],
+  "refresh": "1h",
+  "time": {"from": "now-90d", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "MAPE Trend",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT evaluation_date AS time, mape FROM forecast_accuracy WHERE model_id = 1 ORDER BY evaluation_date",
+        "format": "time_series"
+      }],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 50}}
+    },
+    {
+      "id": 2,
+      "title": "RMSE Trend",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT evaluation_date AS time, rmse FROM forecast_accuracy WHERE model_id = 1 ORDER BY evaluation_date",
+        "format": "time_series"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Forecast Bias",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 7, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT evaluation_date AS time, bias FROM forecast_accuracy WHERE model_id = 1 ORDER BY evaluation_date",
+        "format": "time_series"
+      }],
+      "fieldConfig": {"defaults": {"unit": "percent"}},
+      "thresholds": [{"value": -5, "color": "red"}, {"value": 0, "color": "green"}, {"value": 5, "color": "red"}]
+    },
+    {
+      "id": 4,
+      "title": "Coverage (% actuals in prediction interval)",
+      "type": "stat",
+      "gridPos": {"x": 12, "y": 7, "w": 12, "h": 7},
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT AVG(coverage_pct) * 100 FROM forecast_accuracy WHERE model_id = 1 AND evaluation_date >= now() - interval '30 days'",
+        "format": "table"
+      }],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}}
+    }
+  ]
+}

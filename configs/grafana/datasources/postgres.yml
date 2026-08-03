@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: DemandForecasting
+    type: postgres
+    url: postgres:5432
+    user: mluser
+    secureJsonData:
+      password: mlpassword
+    jsonData:
+      database: demand_forecasting
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: true
+    editable: true

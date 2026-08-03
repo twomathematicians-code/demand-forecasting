@@ -174,6 +174,13 @@ flowchart TD
 | `GET` | `/api/v1/forecast/electricity` | Hourly energy demand & price forecast | None |
 | `GET` | `/api/v1/health` | Model version, metrics, uptime, status | None |
 | `POST` | `/api/v1/admin/retrain` | Trigger on-demand model retraining | Future |
+| `GET` | `/api/v1/dashboard/summary` | Aggregated KPIs: demand, revenue, products | None |
+| `GET` | `/api/v1/dashboard/trends` | Time-series trend data with adaptive rollup | None |
+| `GET` | `/api/v1/dashboard/accuracy` | Forecast accuracy history (MAPE, RMSE, bias) | None |
+| `GET` | `/api/v1/dashboard/forecast-vs-actual` | Backtesting comparison points | None |
+| `GET` | `/api/v1/dashboard/alerts` | Active unacknowledged alerts | None |
+| `WS` | `/ws/dashboard/{client_id}` | Real-time dashboard updates (Kafka + alerts) | None |
+| `WS` | `/ws/forecast/{product_id}` | Live per-product forecast stream | None |
 
 ### Try It Live
 
@@ -290,6 +297,15 @@ Model registry, training pipeline with automated evaluation, inference pipeline 
 ### 📚 **Fully Documented**
 11-page architecture document with industry benchmarks + 14-page SOP covering 9 phases of the ML development lifecycle. Every function has docstrings.
 
+### ⚡ **Redis-Cached Dashboards**
+Redis cache-aside pattern with graceful fallback. Dashboard API responses cached with configurable TTL. Zero-impact bypass when Redis is unavailable.
+
+### 📊 **Grafana Observability**
+Three pre-built dashboards: Demand Overview (KPIs, trends), Forecast Accuracy (MAPE, RMSE, bias), Model Health (drift, alerts, registry). Single-command provisioning via docker-compose.
+
+### 🏢 **Multi-Tenant Ready**
+Tenant isolation via `X-Tenant-ID` header and database-level tenant_id columns. Defaults to single-tenant mode — enable multi-tenancy with one config change.
+
 </td>
 </tr>
 </table>
@@ -352,6 +368,16 @@ demand-forecasting/
 │       ├── config.py               ⚙️ 13 Pydantic models, validated from YAML
 │       ├── logging.py              📋 Structured logging (JSON-ready)
 │       └── metrics.py              📐 MAE, RMSE, MAPE, sMAPE, wMAPE, MASE, MPE, R²
+│
+├── 📂 src/cache/
+│   └── redis_cache.py              ⚡ Redis cache manager + decorator (Phase 3)
+│
+├── 📂 src/streaming/
+│   ├── consumer.py                 📨 Kafka consumer → Postgres (Phase 2)
+│   └── producer.py                 📤 Kafka producer → forecast events (Phase 2)
+│
+├── 📂 src/monitoring/
+│   └── drift_checker.py            🔍 Evidently AI drift → alerts (Phase 2)
 │
 ├── 📂 configs/
 │   └── model_config.yaml           🎛️ All hyperparameters + quality gates + feature config
@@ -460,24 +486,25 @@ gantt
     Config System (13 models)  :done, p1d, 2026-07, 2026-08
     31 Tests + CI              :done, p1e, 2026-07, 2026-08
     
-    section Phase 2 🔜 In Progress
-    CNN-LSTM PyTorch Model     :active, p2a, 2026-08, 2026-09
-    Kafka Streaming Ingestion  :p2b, 2026-08, 2026-09
-    BI Dashboard Routes        :p2c, 2026-09, 2026-10
-    Drift Monitoring (Evidently):p2d, 2026-09, 2026-10
+    section Phase 2 ✅ Done
+    CNN-LSTM PyTorch Model     :done, p2a, 2026-08, 2026-08
+    Kafka Streaming Ingestion  :done, p2b, 2026-08, 2026-08
+    BI Dashboard Routes        :done, p2c, 2026-08, 2026-08
+    Drift Monitoring (Evidently):done, p2d, 2026-08, 2026-08
+    WebSocket Real-Time        :done, p2e, 2026-08, 2026-08
     
-    section Phase 3 📋 Planned
-    Redis Caching              :p3a, 2026-10, 2026-11
-    Grafana Dashboards         :p3b, 2026-10, 2026-11
-    Multi-Tenant Support       :p3c, 2026-11, 2026-12
-    CI/CD Hardening            :p3d, 2026-11, 2026-12
+    section Phase 3 ✅ Done
+    Redis Caching              :done, p3a, 2026-08, 2026-08
+    Grafana Dashboards         :done, p3b, 2026-08, 2026-08
+    Multi-Tenant Support       :done, p3c, 2026-08, 2026-08
+    CI/CD Hardening            :done, p3d, 2026-08, 2026-08
 ```
 
 | Phase | Status | Features |
 |:--|:--|:--|
-| **Phase 1** | ✅ Complete | Real ML ensemble (10% MAPE), database layer (6 tables), 36-feature engineering, 13-model config system, 31 tests |
-| **Phase 2** | 🔜 In Progress | CNN-LSTM PyTorch model, Kafka streaming, BI dashboards, Evidently AI drift monitoring |
-| **Phase 3** | 📋 Planned | Redis caching, Grafana dashboards, multi-tenant, CI/CD hardening |
+| **Phase 1** | ✅ Complete | Real ML ensemble (4 models), database layer (6 tables), 36-feature engineering, 13-model config system, 31 tests |
+| **Phase 2** | ✅ Complete | CNN-LSTM PyTorch model, Kafka streaming, BI dashboard API (5 endpoints), Evidently AI drift monitoring, WebSocket real-time updates, 43 tests |
+| **Phase 3** | ✅ Complete | Redis caching, 3 Grafana dashboards, multi-tenant support, CI/CD hardening (matrix builds, Docker publish on tags) |
 
 ---
 
