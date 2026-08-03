@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cover - Intelligent Demand Forecasting Platform</title>
+<style>
+@page { size: 794px 1123px; margin: 0; }
+:root {
+  --c-bg: #ffffff;
+  --c-accent: #5329d1;
+  --c-text: #212324;
+  --c-muted: #757e82;
+  --c-line: rgba(83, 41, 209, 0.15);
+  --W: 794px;
+  --H: 1123px;
+  --U: calc(var(--W) * 0.05);
+  --safe-top: 10%;
+  --safe-bottom: 10%;
+  --safe-left: 14%;
+  --safe-right: 14%;
+}
+html, body {
+  margin: 0; padding: 0;
+  width: var(--W); height: var(--H);
+  background: var(--c-bg);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  overflow: hidden;
+}
+.page {
+  position: relative;
+  width: var(--W); height: var(--H);
+  background: var(--c-bg);
+}
+/* Layer 1: Decorative accent line */
+.accent-line {
+  position: absolute;
+  left: var(--safe-left);
+  top: 38%;
+  width: 180px;
+  height: 3px;
+  background: var(--c-accent);
+  opacity: 0.7;
+}
+.accent-dot {
+  position: absolute;
+  left: calc(var(--safe-left) + 190px);
+  top: calc(38% - 2.5px);
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  opacity: 0.5;
+}
+/* Layer 2: Side accent bar */
+.side-bar {
+  position: absolute;
+  left: var(--safe-left);
+  top: 44%;
+  bottom: 22%;
+  width: 1px;
+  background: var(--c-line);
+}
+/* Layer 3: Text */
+.kicker {
+  position: absolute;
+  left: var(--safe-left);
+  top: 16%;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  opacity: 0.6;
+}
+.hero {
+  position: absolute;
+  left: var(--safe-left);
+  top: 28%;
+  max-width: 520px;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--c-text);
+}
+.hero .accent-word {
+  color: var(--c-accent);
+}
+.summary {
+  position: absolute;
+  left: calc(var(--safe-left) + 40px);
+  top: 46%;
+  max-width: 400px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--c-muted);
+  opacity: 0.85;
+}
+.meta {
+  position: absolute;
+  left: var(--safe-left);
+  bottom: 18%;
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: var(--c-text);
+  opacity: 0.85;
+}
+.footer {
+  position: absolute;
+  left: var(--safe-left);
+  bottom: 8%;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  opacity: 0.5;
+}
+.footer-line {
+  position: absolute;
+  left: var(--safe-left);
+  right: var(--safe-right);
+  bottom: 12%;
+  height: 1px;
+  background: var(--c-line);
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Layer 1: Decorative -->
+  <div class="accent-line"></div>
+  <div class="accent-dot"></div>
+
+  <!-- Layer 2: Structure -->
+  <div class="side-bar"></div>
+
+  <!-- Layer 3: Text -->
+  <div class="kicker">Client Requirements &amp; Technical Architecture</div>
+
+  <div class="hero">
+    Intelligent<br>
+    <span class="accent-word">Demand Forecasting</span><br>
+    Platform
+  </div>
+
+  <div class="summary">
+    A comprehensive architecture integrating climate-aware utility forecasting,
+    industry-wise demand-supply clustering, real-time data streaming,
+    and CNN+LSTM deep learning within a production-grade MLOps framework.
+  </div>
+
+  <div class="meta">
+    Prepared for Client Review<br>
+    Version 1.0
+  </div>
+
+  <div class="footer-line"></div>
+  <div class="footer">August 2026 &middot; Mahesh Solanki &middot; Confidential</div>
+</div>
+</body>
+</html>

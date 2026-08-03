@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cover - SOP Demand Forecasting ML Development</title>
+<style>
+@page { size: 794px 1123px; margin: 0; }
+:root {
+  --c-bg: #ffffff;
+  --c-accent: #1f7693;
+  --c-text: #1d1f20;
+  --c-muted: #80888c;
+  --c-line: rgba(31, 118, 147, 0.15);
+  --W: 794px;
+  --H: 1123px;
+  --U: calc(var(--W) * 0.05);
+  --safe-top: 10%;
+  --safe-bottom: 10%;
+  --safe-left: 14%;
+  --safe-right: 14%;
+}
+html, body {
+  margin: 0; padding: 0;
+  width: var(--W); height: var(--H);
+  background: var(--c-bg);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  overflow: hidden;
+}
+.page {
+  position: relative;
+  width: var(--W); height: var(--H);
+  background: var(--c-bg);
+}
+/* Layer 1: Geometric accents */
+.geo-rect {
+  position: absolute;
+  right: var(--safe-right);
+  top: 15%;
+  width: 120px;
+  height: 120px;
+  border: 2px solid var(--c-line);
+  opacity: 0.6;
+}
+.geo-line-h {
+  position: absolute;
+  left: var(--safe-left);
+  right: calc(var(--safe-right) + 140px);
+  top: 42%;
+  height: 1px;
+  background: var(--c-accent);
+  opacity: 0.25;
+}
+.geo-line-v {
+  position: absolute;
+  left: calc(var(--safe-left) - 30px);
+  top: 18%;
+  bottom: 28%;
+  width: 1px;
+  background: var(--c-line);
+}
+/* Layer 3: Text */
+.kicker {
+  position: absolute;
+  left: var(--safe-left);
+  top: 18%;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  opacity: 0.6;
+}
+.hero {
+  position: absolute;
+  left: var(--safe-left);
+  top: 30%;
+  max-width: 520px;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--c-text);
+}
+.hero .accent-word {
+  color: var(--c-accent);
+}
+.summary {
+  position: absolute;
+  left: var(--safe-left);
+  top: 48%;
+  max-width: 420px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--c-muted);
+  opacity: 0.85;
+}
+.meta {
+  position: absolute;
+  left: var(--safe-left);
+  bottom: 18%;
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1.4;
+  color: var(--c-text);
+  opacity: 0.85;
+}
+.footer {
+  position: absolute;
+  left: var(--safe-left);
+  bottom: 8%;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  opacity: 0.5;
+}
+.footer-line {
+  position: absolute;
+  left: var(--safe-left);
+  right: var(--safe-right);
+  bottom: 12%;
+  height: 1px;
+  background: var(--c-line);
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Layer 1: Geometric -->
+  <div class="geo-rect"></div>
+  <div class="geo-line-h"></div>
+  <div class="geo-line-v"></div>
+
+  <!-- Layer 3: Text -->
+  <div class="kicker">Standard Operating Procedure</div>
+
+  <div class="hero">
+    <span class="accent-word">Demand Forecasting</span><br>
+    ML Development<br>
+    Lifecycle
+  </div>
+
+  <div class="summary">
+    A comprehensive nine-phase SOP covering the complete machine learning
+    development lifecycle for demand forecasting — from business requirements
+    through deployment, monitoring, and governance.
+  </div>
+
+  <div class="meta">
+    Document Version 1.0<br>
+    Effective: August 2026
+  </div>
+
+  <div class="footer-line"></div>
+  <div class="footer">Internal &middot; Data Science Team &middot; Mahesh Solanki</div>
+</div>
+</body>
+</html>
