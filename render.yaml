@@ -1,8 +1,8 @@
 # Render Blueprint — one-click deploy for demand-forecasting
-# Docs: https://render.com/docs/blueprint-spec
+# After deploy: set matching passwords via Render Dashboard env vars
 
 services:
-  # ── PostgreSQL ──
+  # ── PostgreSQL (TimescaleDB) ──
   - type: pserv
     name: demand-forecast-db
     plan: starter
@@ -15,7 +15,7 @@ services:
       - key: POSTGRES_USER
         value: mluser
       - key: POSTGRES_PASSWORD
-        generateValue: true
+        value: mlpassword123
     disk:
       name: pgdata
       mountPath: /var/lib/postgresql/data
@@ -35,7 +35,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT --workers 2
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
@@ -57,10 +57,7 @@ services:
       - key: DF_DB_NAME
         value: demand_forecasting
       - key: DF_DB_PASSWORD
-        fromService:
-          type: pserv
-          name: demand-forecast-db
-          envVar: POSTGRES_PASSWORD
+        value: mlpassword123
       - key: DF_REDIS_URL
         fromService:
           type: redis
@@ -75,7 +72,7 @@ services:
       - key: DF_MODEL_REGISTRY_PATH
         value: /var/data/models
       - key: DF_ADMIN_API_KEY
-        generateValue: true
+        value: admin-secret-change-me
       - key: DF_KATZILLA_API_KEY
         value: ""
       - key: DF_CORS_ORIGINS
