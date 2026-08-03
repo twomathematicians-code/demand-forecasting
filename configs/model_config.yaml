@@ -1,22 +1,98 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Demand Forecasting — Model Configuration
+# All values are validated by Pydantic models in src/utils/config.py
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 demand:
   default_horizon: 30
   granularities: [daily, weekly, monthly]
   confidence_level: 0.95
+
+# ── Per-Model Hyperparameters ──
 
 models:
   lightgbm:
     n_estimators: 500
     learning_rate: 0.05
     max_depth: 8
+    num_leaves: 31
+    min_child_samples: 20
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.0
+    reg_lambda: 0.0
+    early_stopping_rounds: 50
+
   prophet:
     seasonality_mode: multiplicative
     changepoint_range: 0.8
+    changepoint_prior_scale: 0.05
+    yearly_seasonality: true
+    weekly_seasonality: true
+    daily_seasonality: false
+    seasonality_prior_scale: 10.0
+    holidays_prior_scale: 10.0
+    uncertainty_samples: 1000
+
   sarima:
     order: [2, 1, 2]
     seasonal_order: [1, 1, 1, 7]
+    trend: "c"
+    enforce_stationarity: true
+    enforce_invertibility: true
+
+  cnn_lstm:
+    conv_filters: [64, 128]
+    conv_kernel_size: 3
+    lstm_hidden: 128
+    lstm_layers: 2
+    dropout: 0.3
+    learning_rate: 0.001
+    batch_size: 64
+    epochs: 100
+    sequence_length: 60
+    early_stopping_patience: 20
+
+# ── External Factors / Regressors ──
 
 external_factors:
-  - weather
-  - promotions
-  - holidays
-  - competitor_pricing
+  factors: [weather, promotions, holidays, competitor_pricing]
+  weather_windows: [1, 7, 30]
+
+# ── Quality Gates (model promotion criteria) ──
+
+quality_gates:
+  min_mape: 15.0
+  min_coverage_pct: 0.85
+  max_bias: 5.0
+  min_r2: 0.60
+  max_rmse_ratio: 2.0
+
+# ── Training Pipeline ──
+
+training:
+  train_ratio: 0.60
+  val_ratio: 0.20
+  test_ratio: 0.20
+  cv_folds: 5
+  min_train_periods: 365
+  random_seed: 42
+
+# ── Feature Engineering ──
+
+features:
+  lag_periods: [1, 2, 3, 7, 14, 30, 90, 365]
+  rolling_windows: [7, 14, 30]
+  rolling_stats: [mean, std, min, max]
+  cyclical_encoding: true
+  include_date_features: true
+  include_cluster_features: true
+  max_lag_correlation: 0.95
+
+# ── Inference ──
+
+inference:
+  batch_max_samples: 10000
+  cache_ttl_seconds: 300
+  fallback_enabled: true
+  request_timeout_seconds: 30

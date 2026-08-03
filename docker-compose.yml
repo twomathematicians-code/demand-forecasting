@@ -5,3 +5,33 @@ services:
     restart: unless-stopped
     environment:
       LOG_LEVEL: INFO
+      DF_DB_HOST: postgres
+      DF_DB_PORT: 5432
+      DF_DB_USER: mluser
+      DF_DB_PASSWORD: mlpassword
+      DF_DB_NAME: demand_forecasting
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./models:/app/models
+      - ./configs:/app/configs
+
+  postgres:
+    image: timescale/timescaledb:2.15-pg15
+    ports: ["5432:5432"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: demand_forecasting
+      POSTGRES_USER: mluser
+      POSTGRES_PASSWORD: mlpassword
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mluser -d demand_forecasting"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
