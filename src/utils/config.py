@@ -313,6 +313,10 @@ class Settings(BaseSettings):
     # ── Multi-Tenant ──
     tenant_id: str = "default"
 
+    # ── Katzilla ──
+    katzilla_api_key: str = ""
+    katzilla_enabled: bool = False
+
     @property
     def database_url(self) -> str:
         """Build an asyncpg-compatible database URL."""
