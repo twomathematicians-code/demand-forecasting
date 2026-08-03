@@ -1,11 +1,12 @@
-"""Ensemble model combining Prophet, SARIMA, and LightGBM via Ridge stacking.
+"""Ensemble model combining Prophet, SARIMA, LightGBM, and CNN-LSTM via Ridge stacking.
 
 This is the primary forecasting model. It blends:
   - Prophet (trend + seasonality decomposition)
   - SARIMA (short-term autoregressive baseline)
   - LightGBM (non-linear residuals + external features)
+  - CNN-LSTM (deep sequence modeling — Phase 2)
 
-The three base models' predictions are stacked via a Ridge meta-learner
+The four base models' predictions are stacked via a Ridge meta-learner
 trained on out-of-fold predictions from time-series cross-validation.
 """
 
@@ -24,6 +25,7 @@ from src.features.features import FeatureEngineer
 from src.models.lightgbm_model import LightGBMModel
 from src.models.prophet_model import ProphetModel
 from src.models.sarima_model import SARIMAModel
+from src.models.cnn_lstm_model import CNNLSTMModel
 from src.utils.config import AppConfig
 from src.utils.metrics import compute_all_metrics
 
@@ -45,6 +47,7 @@ class DemandEnsemble:
         self.prophet = ProphetModel(self.config.models.prophet)
         self.sarima = SARIMAModel(self.config.models.sarima)
         self.lightgbm = LightGBMModel(self.config.models.lightgbm)
+        self.cnn_lstm = CNNLSTMModel(self.config.models.cnn_lstm)
         self.meta_model: Ridge | None = None
         self._feature_engineer = FeatureEngineer(self.config.features)
         self._is_fitted: bool = False
@@ -121,17 +124,35 @@ class DemandEnsemble:
         lgb_pred = self.lightgbm.predict(X_all)
         log.info("LightGBM trained")
 
+        # 5b. CNN-LSTM — on train, validate on val (skip if too small)
+        X_train_np = X_train.values if hasattr(X_train, "values") else X_train
+        X_val_np = X_val.values if hasattr(X_val, "values") else X_val
+
+        if len(X_train_np) >= self.config.models.cnn_lstm.batch_size * 2:
+            self.cnn_lstm.fit(
+                X_train_np, y_train.values if hasattr(y_train, "values") else y_train,
+                X_val_np if len(X_val_np) > 0 else None,
+                y_val.values if len(y_val_np := y_val.values if hasattr(y_val, "values") else y_val) > 0 else None,
+            )
+            cnn_pred = self.cnn_lstm.predict(np.asarray(X_all, dtype=float))
+            log.info("CNN-LSTM trained")
+        else:
+            log.warning("Training set too small for CNN-LSTM (%d rows). Skipping.", len(X_train_np))
+            cnn_pred = np.zeros(len(X_all))
+
         # 6. Stack: train Ridge meta-learner on validation set
         # Align model predictions to featurized data length (drop NaN tail from original series)
         n_align = min(n_feat, n_orig)
         prophet_aligned = prophet_train[-n_align:] if len(prophet_train) > n_align else prophet_train
         sarima_aligned = sarima_full[-n_align:] if len(sarima_full) > n_align else sarima_full
         lgb_aligned = lgb_pred[-n_align:] if len(lgb_pred) > n_align else lgb_pred
+        cnn_aligned = cnn_pred[-n_align:] if len(cnn_pred) > n_align else cnn_pred
 
-        # Replace NaN values (from SARIMA padding) with 0 for stacking
+        # Replace NaN values with 0 for stacking
         sarima_aligned = np.nan_to_num(sarima_aligned, nan=0.0)
         prophet_aligned = np.nan_to_num(prophet_aligned, nan=0.0)
         lgb_aligned = np.nan_to_num(lgb_aligned, nan=0.0)
+        cnn_aligned = np.nan_to_num(cnn_aligned, nan=0.0)
 
         # Validation slice
         val_slice = slice(train_end, val_end)
@@ -139,6 +160,7 @@ class DemandEnsemble:
             prophet_aligned[val_slice],
             sarima_aligned[val_slice],
             lgb_aligned[val_slice],
+            cnn_aligned[val_slice],
         ])
 
         # Ensure matching lengths
@@ -161,7 +183,7 @@ class DemandEnsemble:
             self.meta_model = Ridge(alpha=1.0, fit_intercept=True)
             self.meta_model.fit(stack_features[:min_len], y_val_slice[:min_len])
 
-        log.info("Meta-learner coefficients: Prophet=%.4f, SARIMA=%.4f, LightGBM=%.4f",
+        log.info("Meta-learner coefficients: Prophet=%.4f, SARIMA=%.4f, LightGBM=%.4f, CNN-LSTM=%.4f",
                  *self.meta_model.coef_)
 
         # 7. Evaluate on test set
@@ -169,9 +191,10 @@ class DemandEnsemble:
         prophet_test = prophet_aligned[test_slice]
         sarima_test = sarima_aligned[test_slice]
         lgb_test = lgb_aligned[test_slice]
+        cnn_test = cnn_aligned[test_slice]
         y_test = y_all.iloc[test_slice].values
 
-        test_stack = np.column_stack([prophet_test, sarima_test, lgb_test])
+        test_stack = np.column_stack([prophet_test, sarima_test, lgb_test, cnn_test])
         min_len_test = min(len(test_stack), len(y_test))
         if min_len_test >= 2:
             ensemble_pred = self.meta_model.predict(test_stack[:min_len_test])
@@ -188,15 +211,19 @@ class DemandEnsemble:
             self._metrics["lgb_mape"] = compute_all_metrics(
                 y_test[:min_len_test], lgb_test[:min_len_test]
             ).get("mape", float("nan"))
+            self._metrics["cnn_mape"] = compute_all_metrics(
+                y_test[:min_len_test], cnn_test[:min_len_test]
+            ).get("mape", float("nan"))
         else:
             self._metrics = {"mape": float("nan"), "note": "Test set too small for evaluation"}
 
         self._is_fitted = True
-        log.info("Ensemble trained. Test MAPE: %.2f%% (Prophet: %.2f%%, SARIMA: %.2f%%, LGB: %.2f%%)",
+        log.info("Ensemble trained. Test MAPE: %.2f%% (Prophet: %.2f%%, SARIMA: %.2f%%, LGB: %.2f%%, CNN: %.2f%%)",
                  self._metrics.get("mape", float("nan")),
                  self._metrics.get("prophet_mape", float("nan")),
                  self._metrics.get("sarima_mape", float("nan")),
-                 self._metrics.get("lgb_mape", float("nan")))
+                 self._metrics.get("lgb_mape", float("nan")),
+                 self._metrics.get("cnn_mape", float("nan")))
         return self
 
     # ── Prediction ─────────────────────────────────────────
@@ -222,9 +249,17 @@ class DemandEnsemble:
         # trend as a proxy feature and generate a simple feature set
         lgb_preds = np.full(horizon_days, prophet_preds.mean())  # fallback
 
-        # Ensemble stack
-        min_len = min(len(prophet_preds), len(sarima_preds))
-        stack = np.column_stack([prophet_preds[:min_len], sarima_preds[:min_len], lgb_preds[:min_len]])
+        # CNN-LSTM fallback during inference
+        cnn_preds = np.full(horizon_days, prophet_preds.mean())
+
+        # Ensemble stack (4 columns)
+        min_len = min(len(prophet_preds), len(sarima_preds), len(lgb_preds), len(cnn_preds))
+        stack = np.column_stack([
+            prophet_preds[:min_len],
+            sarima_preds[:min_len],
+            lgb_preds[:min_len],
+            cnn_preds[:min_len],
+        ])
         ensemble_preds = self.meta_model.predict(stack)
 
         # Build output dataframe
@@ -267,6 +302,7 @@ class DemandEnsemble:
         self.prophet.save(path / "prophet.json")
         self.sarima.save(path / "sarima.joblib")
         self.lightgbm.save(path / "lightgbm.joblib")
+        self.cnn_lstm.save(path / "cnn_lstm.pt")
 
         # Save meta-model and metadata
         meta = {
@@ -285,6 +321,8 @@ class DemandEnsemble:
         self.prophet.load(path / "prophet.json")
         self.sarima.load(path / "sarima.joblib")
         self.lightgbm.load(path / "lightgbm.joblib")
+        if (path / "cnn_lstm.pt").exists():
+            self.cnn_lstm.load(path / "cnn_lstm.pt")
 
         meta = joblib.load(path / "meta.joblib")
         self.meta_model = meta["meta_model"]

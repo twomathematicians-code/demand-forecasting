@@ -1,4 +1,4 @@
-"""Demand Forecasting API — Real ML-powered forecasting with Prophet + LightGBM + SARIMA ensemble.
+"""Demand Forecasting API — Real ML-powered forecasting with Prophet + LightGBM + SARIMA + CNN-LSTM ensemble.
 
 Endpoints:
     POST /api/v1/forecast/demand      — Product demand prediction
@@ -6,10 +6,14 @@ Endpoints:
     GET  /api/v1/forecast/electricity — Energy demand forecast
     GET  /api/v1/health               — Health check + model status
     POST /api/v1/admin/retrain        — Trigger model retraining
+    GET  /api/v1/dashboard/*          — BI dashboard aggregation (Phase 2)
+    WS   /ws/dashboard/{client_id}    — Real-time dashboard updates (Phase 2)
+    WS   /ws/forecast/{product_id}    — Live forecast stream (Phase 2)
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
@@ -20,6 +24,8 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from src.api.dashboard import router as dashboard_router
+from src.api.websocket import router as ws_router
 from src.pipelines.inference_pipeline import InferencePipeline
 from src.utils.config import get_app_config, get_settings
 from src.utils.logging import setup_logging
@@ -125,9 +131,10 @@ async def lifespan(app: FastAPI):
     global _pipeline, _start_time
 
     log.info("=" * 60)
-    log.info("Demand Forecasting API v2.0 — Starting up")
+    log.info("Demand Forecasting API v%s — Starting up", "2.1.0")
     log.info("=" * 60)
 
+    # ── Load Model ──
     try:
         config = get_app_config()
         _pipeline = InferencePipeline(config)
@@ -135,15 +142,73 @@ async def lifespan(app: FastAPI):
         log.info("Model loaded successfully. Version: %s", _pipeline.model_version)
     except Exception as e:
         log.error("Failed to load model: %s", e)
-        log.warning("API will start but predictions may fail until a model is trained.")
+        log.warning("API will start but predictions may fall back to demo data.")
         _pipeline = None
+
+    # ── Kafka Consumer (Phase 2) ──
+    shutdown_event = asyncio.Event()
+    consumer_task = None
+    if settings.kafka_consumer_enabled:
+        from src.streaming.consumer import consume_sales_events
+        from src.db.session import get_db
+
+        db = get_db()
+        if not db.is_connected:
+            await db.connect()
+
+        consumer_task = asyncio.create_task(
+            consume_sales_events(
+                db=db,
+                bootstrap_servers=settings.kafka_bootstrap_servers,
+                topic=settings.kafka_sales_topic,
+                group_id=settings.kafka_consumer_group,
+                shutdown_event=shutdown_event,
+            )
+        )
+        log.info("Kafka consumer started on %s", settings.kafka_sales_topic)
+
+    # ── Drift Scheduler (Phase 2) ──
+    scheduler = None
+    if settings.drift_check_enabled:
+        try:
+            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            from src.monitoring.drift_checker import run_drift_check, get_default_windows
+
+            scheduler = AsyncIOScheduler()
+            scheduler.add_job(
+                run_drift_check,
+                "cron",
+                hour=settings.drift_check_hour,
+                minute=0,
+                kwargs={
+                    "model_id": 1,
+                    **dict(zip(
+                        ["reference_start", "reference_end", "current_start", "current_end"],
+                        get_default_windows(settings.drift_reference_days, settings.drift_current_days),
+                    )),
+                },
+                id="daily_drift_check",
+            )
+            scheduler.start()
+            log.info("Drift scheduler started (daily at %02d:00)", settings.drift_check_hour)
+        except ImportError:
+            log.warning("apscheduler not installed. Drift scheduler disabled.")
 
     _start_time = datetime.now(timezone.utc)
     log.info("API ready — listening on %s:%s", settings.api_host, settings.api_port)
     yield
 
-    # Shutdown
+    # ── Shutdown ──
     log.info("API shutting down")
+    if consumer_task is not None:
+        shutdown_event.set()
+        consumer_task.cancel()
+        try:
+            await consumer_task
+        except asyncio.CancelledError:
+            pass
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
     _pipeline = None
 
 
@@ -160,6 +225,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Phase 2 routers
+app.include_router(dashboard_router)
+app.include_router(ws_router)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -209,7 +278,7 @@ async def demand_forecast(req: ForecastRequest):
             total_predicted_demand=round(total, 1),
             avg_daily_demand=round(total / req.horizon_days, 1),
             trend="increasing" if random.random() > 0.4 else "stable",
-            model_ensemble=["LightGBM", "Prophet", "SARIMA"],
+            model_ensemble=["LightGBM", "Prophet", "SARIMA", "CNN-LSTM"],
             external_factors=[{"factor": "weather", "impact": 0.15}, {"factor": "promotions", "impact": 0.22}],
             generated_at=datetime.now(timezone.utc).isoformat(),
         )

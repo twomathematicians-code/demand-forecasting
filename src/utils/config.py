@@ -294,6 +294,19 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_workers: int = Field(1, ge=1, le=8)
 
+    # ── Kafka ──
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_consumer_group: str = "demand-forecasting"
+    kafka_sales_topic: str = "sales.events"
+    kafka_forecast_topic: str = "forecasts.generated"
+    kafka_consumer_enabled: bool = False  # Off by default — enable in production
+
+    # ── Drift Monitoring ──
+    drift_check_enabled: bool = False
+    drift_check_hour: int = Field(6, ge=0, le=23)
+    drift_reference_days: int = Field(90, ge=30, le=365)
+    drift_current_days: int = Field(30, ge=7, le=90)
+
     @property
     def database_url(self) -> str:
         """Build an asyncpg-compatible database URL."""

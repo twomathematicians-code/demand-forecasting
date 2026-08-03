@@ -23,6 +23,11 @@ pyyaml = "^6.0"
 joblib = "^1.4"
 sqlalchemy = "^2.0"
 alembic = "^1.13"
+torch = "^2.4"
+aiokafka = "^0.10"
+evidently = "^0.4"
+apscheduler = "^3.10"
+websockets = "^12.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2"

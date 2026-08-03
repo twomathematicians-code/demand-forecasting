@@ -196,3 +196,77 @@ GET_ACTIVE_ALERTS = """
         END,
         created_at DESC
 """
+
+# ═══════════════════════════════════════════════════════════════════
+# Dashboard — Aggregation queries (Phase 2)
+# ═══════════════════════════════════════════════════════════════════
+
+DASHBOARD_SUMMARY = """
+    SELECT
+        COALESCE(SUM(total_qty), 0) AS total_demand,
+        COALESCE(SUM(total_revenue), 0) AS total_revenue,
+        COALESCE(AVG(avg_qty), 0) AS avg_daily_demand,
+        COUNT(DISTINCT product_id) AS active_products
+    FROM actuals_daily_rollup
+    WHERE bucket >= $1 AND bucket <= $2
+"""
+
+DASHBOARD_TOP_PRODUCTS = """
+    SELECT
+        product_id,
+        SUM(total_qty) AS total_qty,
+        SUM(total_revenue) AS total_revenue
+    FROM actuals_daily_rollup
+    WHERE bucket >= $1 AND bucket <= $2
+    GROUP BY product_id
+    ORDER BY total_revenue DESC
+    LIMIT $3
+"""
+
+DASHBOARD_TREND = """
+    SELECT
+        bucket,
+        SUM(total_qty) AS total_qty,
+        SUM(total_revenue) AS total_revenue,
+        AVG(avg_qty) AS avg_qty
+    FROM {}
+    WHERE bucket >= $1 AND bucket <= $2
+    GROUP BY bucket
+    ORDER BY bucket
+"""
+
+FORECAST_VS_ACTUAL = """
+    SELECT
+        f.target_date,
+        f.predicted_qty,
+        COALESCE(a.quantity_sold, 0) AS actual_qty,
+        (f.predicted_qty - COALESCE(a.quantity_sold, 0)) AS error,
+        f.yhat_lower,
+        f.yhat_upper
+    FROM forecasts f
+    LEFT JOIN actuals a
+        ON f.product_id = a.product_id
+        AND f.target_date = a.date
+        AND f.store_id = a.store_id
+    WHERE f.model_id = $1
+      AND f.target_date >= $2
+      AND f.target_date <= $3
+      AND ($4::int IS NULL OR f.product_id = $4)
+    ORDER BY f.target_date
+"""
+
+DASHBOARD_ACCURACY_TREND = """
+    SELECT
+        evaluation_date,
+        horizon_days,
+        mae,
+        rmse,
+        mape,
+        bias,
+        wmape
+    FROM forecast_accuracy
+    WHERE model_id = $1
+      AND evaluation_date >= $2
+    ORDER BY evaluation_date DESC
+    LIMIT $3
+"""

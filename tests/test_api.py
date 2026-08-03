@@ -54,7 +54,7 @@ async def test_demand_forecast(client):
     assert "total_predicted_demand" in data
     assert "avg_daily_demand" in data
     assert data["trend"] in ("increasing", "decreasing", "stable")
-    assert len(data["model_ensemble"]) == 3
+    assert len(data["model_ensemble"]) == 4
 
 
 @pytest.mark.asyncio
