@@ -1,0 +1,69 @@
+# Fly.io configuration for Demand Forecasting API
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "demand-forecast-api"
+
+primary_region = "iad"  # Virginia — change to nearest: ams, lhr, sin, syd, gru
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DF_ENVIRONMENT = "production"
+  DF_LOG_LEVEL = "INFO"
+  DF_REDIS_ENABLED = "true"
+  DF_REDIS_URL = "redis://localhost:6379/0"
+  DF_KAFKA_CONSUMER_ENABLED = "false"
+  DF_DRIFT_CHECK_ENABLED = "false"
+  DF_MODEL_REGISTRY_PATH = "/data/models"
+  DF_CORS_ORIGINS = "https://demand-forecast-api.fly.dev"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+    force_https = true
+
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "get"
+    path = "/api/v1/health"
+    protocol = "http"
+    tls_skip_verify = true
+
+  [[services.http_checks]]
+    interval = "10s"
+    timeout = "3s"
+    grace_period = "5s"
+    method = "get"
+    path = "/api/v1/health"
+    protocol = "http"
+    headers = { Type = "readiness" }
+
+[deploy]
+  release_command = "python -c 'from src.utils.config import get_app_config; print(\"Config OK\")'"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[[statics]]
+  guest_path = "/app/static"
+  url_prefix = "/static"
+
+[mounts]
+  source = "model_data"
+  destination = "/data"
+  initial_size = "3gb"
