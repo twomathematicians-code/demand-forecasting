@@ -130,106 +130,32 @@ def get_pipeline() -> InferencePipeline:
     return _pipeline
 
 
+async def ensure_model_loaded() -> InferencePipeline:
+    """Lazy-load the model on first forecast request."""
+    global _pipeline
+    if _pipeline is None or not _pipeline.is_loaded:
+        config = get_app_config()
+        _pipeline = InferencePipeline(config)
+        _pipeline.load_model(MODEL_DIR)
+        log.info("Model lazy-loaded: version=%s", _pipeline.model_version)
+    return _pipeline
+
+
 # ═══════════════════════════════════════════════════════════
 # FastAPI Application
 # ═══════════════════════════════════════════════════════════
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: load the ML model. Shutdown: clean up resources."""
+    """Startup: instant health check. Model loaded lazily on first forecast."""
     global _pipeline, _start_time
 
-    log.info("=" * 60)
-    log.info("Demand Forecasting API v%s — Starting up", "2.1.0")
-    log.info("=" * 60)
-
-    # ── Load Model ──
-    try:
-        config = get_app_config()
-        _pipeline = InferencePipeline(config)
-        _pipeline.load_model(MODEL_DIR)
-        log.info("Model loaded successfully. Version: %s", _pipeline.model_version)
-    except Exception as e:
-        log.error("Failed to load model: %s", e)
-        log.warning("API will start but predictions may fall back to demo data.")
-        _pipeline = None
-
-    # ── Kafka Consumer (Phase 2) ──
-    shutdown_event = asyncio.Event()
-    consumer_task = None
-    if settings.kafka_consumer_enabled:
-        from src.db.session import get_db
-        from src.streaming.consumer import consume_sales_events
-
-        db = get_db()
-        if not db.is_connected:
-            await db.connect()
-
-        consumer_task = asyncio.create_task(
-            consume_sales_events(
-                db=db,
-                bootstrap_servers=settings.kafka_bootstrap_servers,
-                topic=settings.kafka_sales_topic,
-                group_id=settings.kafka_consumer_group,
-                shutdown_event=shutdown_event,
-            )
-        )
-        log.info("Kafka consumer started on %s", settings.kafka_sales_topic)
-
-    # ── Redis Cache (Phase 3) ──
-    if settings.redis_enabled:
-        cache = get_cache()
-        await cache.connect()
-        log.info("Redis cache ready: %s", settings.redis_url)
-
-    # ── Drift Scheduler (Phase 2) ──
-    scheduler = None
-    if settings.drift_check_enabled:
-        try:
-            from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-            from src.monitoring.drift_checker import (
-                get_default_windows,
-                run_drift_check,
-            )
-
-            scheduler = AsyncIOScheduler()
-            scheduler.add_job(
-                run_drift_check,
-                "cron",
-                hour=settings.drift_check_hour,
-                minute=0,
-                kwargs={
-                    "model_id": 1,
-                    **dict(zip(
-                        ["reference_start", "reference_end", "current_start", "current_end"],
-                        get_default_windows(settings.drift_reference_days, settings.drift_current_days),
-                    )),
-                },
-                id="daily_drift_check",
-            )
-            scheduler.start()
-            log.info("Drift scheduler started (daily at %02d:00)", settings.drift_check_hour)
-        except ImportError:
-            log.warning("apscheduler not installed. Drift scheduler disabled.")
-
+    log.info("Demand Forecasting API v3.1.0 — Starting")
+    _pipeline = None  # Lazy-load on first forecast request
     _start_time = datetime.now(timezone.utc)
-    log.info("API ready — listening on %s:%s", settings.api_host, settings.api_port)
+    log.info("API ready (model lazy-loads on first forecast)")
     yield
-
-    # ── Shutdown ──
     log.info("API shutting down")
-    if consumer_task is not None:
-        shutdown_event.set()
-        consumer_task.cancel()
-        try:
-            await consumer_task
-        except asyncio.CancelledError:
-            pass
-    if scheduler is not None:
-        scheduler.shutdown(wait=False)
-    if settings.redis_enabled:
-        await get_cache().disconnect()
     _pipeline = None
 
 
@@ -282,7 +208,7 @@ async def demand_forecast(req: ForecastRequest):
     Ridge stacking for the final prediction.
     """
     try:
-        pipeline = get_pipeline()
+        pipeline = await ensure_model_loaded()
         result = pipeline.predict(
             product_id=req.product_id,
             horizon_days=req.horizon_days,
@@ -334,7 +260,7 @@ async def order_forecast(days: int = Query(default=7, ge=1, le=30)):
     order volume prediction with day-of-week effects.
     """
     try:
-        pipeline = get_pipeline()
+        pipeline = await ensure_model_loaded()
         result = pipeline.predict(product_id="orders", horizon_days=days)
 
         predictions = []
@@ -374,7 +300,7 @@ async def electricity_forecast(hours: int = Query(default=24, ge=1, le=168)):
     energy-specific models with weather covariates.
     """
     try:
-        pipeline = get_pipeline()
+        pipeline = await ensure_model_loaded()
         result = pipeline.predict(product_id="electricity", horizon_days=hours // 24 + 1)
 
         predictions = []
@@ -421,7 +347,7 @@ async def model_explainability(
     to the ensemble prediction.
     """
     try:
-        pipeline = get_pipeline()
+        pipeline = await ensure_model_loaded()
         result = pipeline.predict(product_id=product_id, horizon_days=horizon_days)
 
         # Get LightGBM feature importance if available
