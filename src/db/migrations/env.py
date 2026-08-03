@@ -1,6 +1,5 @@
 """Alembic environment configuration for demand forecasting."""
 
-import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path

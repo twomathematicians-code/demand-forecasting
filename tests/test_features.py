@@ -1,6 +1,5 @@
 """Tests for feature engineering."""
 
-import pandas as pd
 from src.features.features import FeatureEngineer
 from src.utils.config import FeatureConfig
 

@@ -1,10 +1,14 @@
 """Tests for configuration system."""
 
 import pytest
+
 from src.utils.config import (
-    AppConfig, Settings,
-    LightGBMConfig, ProphetConfig, SARIMAConfig,
-    QualityGatesConfig, FeatureConfig,
+    AppConfig,
+    LightGBMConfig,
+    ProphetConfig,
+    QualityGatesConfig,
+    SARIMAConfig,
+    Settings,
 )
 
 

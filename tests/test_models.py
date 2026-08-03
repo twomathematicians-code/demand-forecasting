@@ -2,12 +2,11 @@
 
 import numpy as np
 import pandas as pd
-import pytest
 
+from src.models.ensemble import DemandEnsemble
+from src.models.lightgbm_model import LightGBMModel
 from src.models.prophet_model import ProphetModel
 from src.models.sarima_model import SARIMAModel
-from src.models.lightgbm_model import LightGBMModel
-from src.models.ensemble import DemandEnsemble
 from src.utils.config import AppConfig
 
 

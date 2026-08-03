@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+
 from src.features.features import FeatureEngineer
 from src.utils.config import FeatureConfig
 
@@ -38,7 +39,7 @@ class FeaturePipeline:
             raise RuntimeError("FeaturePipeline must be fit before transform. Call fit_transform() first.")
         return self._engineer.transform(df)
 
-    def fit(self, df: pd.DataFrame, target_col: str = "quantity_sold") -> "FeaturePipeline":
+    def fit(self, df: pd.DataFrame, target_col: str = "quantity_sold") -> FeaturePipeline:
         """Fit without returning data (useful for Pipeline integration)."""
         self.fit_transform(df, target_col)
         return self

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.utils.config import CNNLSTMConfig
@@ -182,7 +182,7 @@ class CNNLSTMModel:
         y_train: np.ndarray,
         X_valid: np.ndarray | None = None,
         y_valid: np.ndarray | None = None,
-    ) -> "CNNLSTMModel":
+    ) -> CNNLSTMModel:
         """Train the CNN-LSTM model.
 
         Args:
@@ -303,7 +303,7 @@ class CNNLSTMModel:
         )
         log.info("CNN-LSTM model saved to %s", path)
 
-    def load(self, path: str | Path) -> "CNNLSTMModel":
+    def load(self, path: str | Path) -> CNNLSTMModel:
         """Load model from disk."""
         path = Path(path)
         checkpoint = torch.load(path, map_location=self._device, weights_only=False)

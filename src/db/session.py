@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 import asyncpg
-from src.utils.config import get_settings, Settings
+
+from src.utils.config import Settings, get_settings
 
 
 class Database:

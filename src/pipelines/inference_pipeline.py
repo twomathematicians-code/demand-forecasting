@@ -41,7 +41,7 @@ class InferencePipeline:
             return {}
         return self._ensemble.metrics
 
-    def load_model(self, model_dir: str | Path = "models/ensemble") -> "InferencePipeline":
+    def load_model(self, model_dir: str | Path = "models/ensemble") -> InferencePipeline:
         """Load a trained ensemble from disk.
 
         If the model directory does not exist, creates a minimal fallback

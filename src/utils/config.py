@@ -19,7 +19,6 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 # ═══════════════════════════════════════════════════════════════════
 # Enums
 # ═══════════════════════════════════════════════════════════════════
@@ -223,7 +222,7 @@ class AppConfig(BaseModel):
     inference: InferenceConfig = InferenceConfig()
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "AppConfig":
+    def from_yaml(cls, path: str | Path) -> AppConfig:
         """Load and validate configuration from a YAML file.
 
         Args:
@@ -245,7 +244,7 @@ class AppConfig(BaseModel):
         return cls.model_validate(raw)
 
     @classmethod
-    def default(cls) -> "AppConfig":
+    def default(cls) -> AppConfig:
         """Return an AppConfig with all defaults (no YAML needed)."""
         return cls()
 

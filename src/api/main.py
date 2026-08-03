@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -150,8 +150,8 @@ async def lifespan(app: FastAPI):
     shutdown_event = asyncio.Event()
     consumer_task = None
     if settings.kafka_consumer_enabled:
-        from src.streaming.consumer import consume_sales_events
         from src.db.session import get_db
+        from src.streaming.consumer import consume_sales_events
 
         db = get_db()
         if not db.is_connected:
@@ -179,7 +179,11 @@ async def lifespan(app: FastAPI):
     if settings.drift_check_enabled:
         try:
             from apscheduler.schedulers.asyncio import AsyncIOScheduler
-            from src.monitoring.drift_checker import run_drift_check, get_default_windows
+
+            from src.monitoring.drift_checker import (
+                get_default_windows,
+                run_drift_check,
+            )
 
             scheduler = AsyncIOScheduler()
             scheduler.add_job(
@@ -261,8 +265,8 @@ async def demand_forecast(req: ForecastRequest):
         return ForecastResponse(**result)
     except RuntimeError:
         # Fallback: return demo forecast when model not loaded
-        import random
         import math
+        import random
         random.seed(hash(req.product_id + str(req.horizon_days)) % 10000)
         base = random.uniform(50, 500)
         points = []
@@ -293,7 +297,7 @@ async def demand_forecast(req: ForecastRequest):
         )
     except Exception as e:
         log.exception("Forecast failed for product %s", req.product_id)
-        raise HTTPException(status_code=500, detail=f"Forecast failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Forecast failed: {e!s}")
 
 
 @app.get("/api/v1/forecast/orders", response_model=list[OrderPrediction], tags=["Forecast"])
@@ -409,7 +413,6 @@ async def trigger_retrain():
     Trains a fresh ensemble on available data and reloads the inference pipeline.
     In production, this would be auth-gated and run as a background task.
     """
-    from src.data.loader import DataLoader
     from src.pipelines.training_pipeline import TrainingPipeline
 
     global _pipeline
@@ -439,4 +442,4 @@ async def trigger_retrain():
         raise
     except Exception as e:
         log.exception("Retraining failed")
-        raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Retraining failed: {e!s}")

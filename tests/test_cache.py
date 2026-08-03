@@ -1,6 +1,7 @@
 """Tests for Redis cache manager."""
 
 import pytest
+
 from src.cache.redis_cache import CacheManager
 
 

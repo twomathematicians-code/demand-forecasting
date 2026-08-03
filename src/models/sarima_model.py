@@ -47,7 +47,7 @@ class SARIMAModel:
         series: np.ndarray | pd.Series,
         exog: np.ndarray | None = None,
         freq: str = "D",
-    ) -> "SARIMAModel":
+    ) -> SARIMAModel:
         """Fit SARIMAX to a univariate time series.
 
         Args:
@@ -118,7 +118,7 @@ class SARIMAModel:
                       "freq": self._freq}, path)
         log.info("SARIMA model saved to %s", path)
 
-    def load(self, path: str | Path) -> "SARIMAModel":
+    def load(self, path: str | Path) -> SARIMAModel:
         """Load a serialized model from disk."""
         data = joblib.load(Path(path))
         self._result = data["result"]

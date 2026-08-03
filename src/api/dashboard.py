@@ -7,20 +7,18 @@ from __future__ import annotations
 
 import logging
 from datetime import date, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from src.db.queries import (
+    DASHBOARD_ACCURACY_TREND,
     DASHBOARD_SUMMARY,
     DASHBOARD_TOP_PRODUCTS,
     DASHBOARD_TREND,
     FORECAST_VS_ACTUAL,
-    DASHBOARD_ACCURACY_TREND,
     GET_ACTIVE_ALERTS,
 )
 from src.db.session import get_connection
-from src.cache.redis_cache import cached
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["📊 Dashboard"])
 log = logging.getLogger(__name__)
@@ -30,9 +28,7 @@ log = logging.getLogger(__name__)
 
 def _choose_rollup_table(days: int) -> str:
     """Select the right aggregation table based on requested time range."""
-    if days <= 7:
-        return "actuals_daily_rollup"
-    elif days <= 60:
+    if days <= 7 or days <= 60:
         return "actuals_daily_rollup"
     elif days <= 365:
         return "actuals_weekly_rollup"
@@ -152,7 +148,7 @@ async def forecast_accuracy(
 @router.get("/forecast-vs-actual")
 async def forecast_vs_actual(
     model_id: int = Query(default=1, ge=1),
-    product_id: Optional[int] = Query(default=None),
+    product_id: int | None = Query(default=None),
     days: int = Query(default=30, ge=1, le=90),
 ):
     """Compare forecasts against actuals for backtesting visualization."""

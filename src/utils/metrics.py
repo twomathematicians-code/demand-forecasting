@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
 
 def mean_absolute_error(actual: np.ndarray, predicted: np.ndarray) -> float:
@@ -163,11 +162,7 @@ def quality_gates_passed(metrics: dict, thresholds: dict) -> tuple[bool, list[st
         val = metrics[metric]
         thresh = thresholds[metric]
 
-        if op == "lt" and val > thresh:
-            failures.append(msg.format(val, thresh))
-        elif op == "gt" and val < thresh:
-            failures.append(msg.format(val, thresh))
-        elif op == "abs_lt" and abs(val) > thresh:
+        if op == "lt" and val > thresh or op == "gt" and val < thresh or op == "abs_lt" and abs(val) > thresh:
             failures.append(msg.format(val, thresh))
 
     return len(failures) == 0, failures

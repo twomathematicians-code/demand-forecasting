@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from src.db.queries import INSERT_DRIFT, INSERT_ALERT
+from src.db.queries import INSERT_ALERT, INSERT_DRIFT
 from src.db.session import get_db
 
 log = logging.getLogger(__name__)
@@ -35,9 +35,9 @@ async def run_drift_check(
     result = {"features_checked": 0, "drifts_detected": 0, "alerts_created": 0, "error": None}
 
     try:
-        from evidently.report import Report
-        from evidently.metric_preset import DataDriftPreset, DataQualityPreset
         from evidently import ColumnMapping
+        from evidently.metric_preset import DataDriftPreset, DataQualityPreset
+        from evidently.report import Report
     except ImportError:
         result["error"] = "evidently not installed"
         log.warning("Evidently AI not installed. Drift check skipped.")

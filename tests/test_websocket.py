@@ -35,7 +35,7 @@ async def test_websocket_connect():
 @pytest.mark.asyncio
 async def test_websocket_manager_singleton():
     """Verify the WebSocket manager is a singleton."""
-    from src.api.websocket import get_ws_manager, WebSocketManager
+    from src.api.websocket import WebSocketManager, get_ws_manager
 
     manager = get_ws_manager()
     assert isinstance(manager, WebSocketManager)

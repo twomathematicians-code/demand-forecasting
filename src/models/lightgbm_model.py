@@ -6,9 +6,9 @@ import logging
 from pathlib import Path
 
 import joblib
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
 
 from src.utils.config import LightGBMConfig
 
@@ -51,7 +51,7 @@ class LightGBMModel:
         y_train: np.ndarray | pd.Series,
         X_valid: pd.DataFrame | np.ndarray | None = None,
         y_valid: np.ndarray | pd.Series | None = None,
-    ) -> "LightGBMModel":
+    ) -> LightGBMModel:
         """Train LightGBM with optional early stopping on validation set.
 
         Args:
@@ -145,7 +145,7 @@ class LightGBMModel:
         }, path)
         log.info("LightGBM model saved to %s", path)
 
-    def load(self, path: str | Path) -> "LightGBMModel":
+    def load(self, path: str | Path) -> LightGBMModel:
         """Load a serialized model from disk."""
         data = joblib.load(Path(path))
         self._model = data["model"]

@@ -22,10 +22,10 @@ import pandas as pd
 from sklearn.linear_model import Ridge
 
 from src.features.features import FeatureEngineer
+from src.models.cnn_lstm_model import CNNLSTMModel
 from src.models.lightgbm_model import LightGBMModel
 from src.models.prophet_model import ProphetModel
 from src.models.sarima_model import SARIMAModel
-from src.models.cnn_lstm_model import CNNLSTMModel
 from src.utils.config import AppConfig
 from src.utils.metrics import compute_all_metrics
 
@@ -64,7 +64,7 @@ class DemandEnsemble:
 
     # ── Training ───────────────────────────────────────────
 
-    def fit(self, df: pd.DataFrame, target_col: str = "quantity_sold") -> "DemandEnsemble":
+    def fit(self, df: pd.DataFrame, target_col: str = "quantity_sold") -> DemandEnsemble:
         """Train the full ensemble on historical demand data.
 
         Args:
@@ -314,7 +314,7 @@ class DemandEnsemble:
         joblib.dump(meta, path / "meta.joblib")
         log.info("Ensemble saved to %s (MAPE: %.2f%%)", path, self._metrics.get("mape", float("nan")))
 
-    def load(self, path: str | Path) -> "DemandEnsemble":
+    def load(self, path: str | Path) -> DemandEnsemble:
         """Load a saved ensemble from a directory."""
         path = Path(path)
 

@@ -5,10 +5,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from prophet import Prophet
-from prophet.serialize import model_to_json, model_from_json
+from prophet.serialize import model_from_json, model_to_json
 
 from src.utils.config import ProphetConfig
 
@@ -41,7 +40,7 @@ class ProphetModel:
             raise RuntimeError("Model not fitted. Call fit() first.")
         return self._model
 
-    def fit(self, df: pd.DataFrame, regressors: list[str] | None = None) -> "ProphetModel":
+    def fit(self, df: pd.DataFrame, regressors: list[str] | None = None) -> ProphetModel:
         """Train Prophet on historical data.
 
         Args:
@@ -117,7 +116,7 @@ class ProphetModel:
             f.write(model_to_json(self._model))
         log.info("Prophet model saved to %s", path)
 
-    def load(self, path: str | Path) -> "ProphetModel":
+    def load(self, path: str | Path) -> ProphetModel:
         """Load a serialized model from a JSON file."""
         path = Path(path)
         with open(path) as f:

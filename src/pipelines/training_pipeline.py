@@ -6,13 +6,12 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from src.data.loader import DataLoader
 from src.models.ensemble import DemandEnsemble
 from src.utils.config import AppConfig, get_app_config
-from src.utils.metrics import compute_all_metrics, quality_gates_passed
+from src.utils.metrics import quality_gates_passed
 
 log = logging.getLogger(__name__)
 
