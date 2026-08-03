@@ -1,7 +1,7 @@
 [tool.poetry]
 packages = [{include = "src"}]
 name = "demand-forecasting"
-version = "1.0.0"
+version = "2.1.0"
 description = "Demand forecasting for supply chain: LightGBM + Prophet + SARIMA ensemble for product demand, order volumes, and energy consumption."
 authors = ["Mahesh Solanki"]
 
