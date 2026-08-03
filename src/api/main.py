@@ -27,11 +27,13 @@ from pydantic import BaseModel, Field
 from src.api.dashboard import router as dashboard_router
 from src.api.websocket import router as ws_router
 from src.api.middleware import (
-    RequestIDMiddleware,
     RateLimitMiddleware,
+    RequestIDMiddleware,
     StructuredLogMiddleware,
     error_handler,
 )
+from src.api.security import SecurityHeadersMiddleware
+from src.api.metrics import router as metrics_router
 from src.cache.redis_cache import get_cache
 from src.pipelines.inference_pipeline import InferencePipeline
 from src.utils.config import get_app_config, get_settings
@@ -238,15 +240,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add production middlewares
+# Production CORS — restrict in production, open in development
+cors_origins = ["*"]
+if settings.is_production:
+    cors_env = getattr(settings, "cors_origins", "")
+    if cors_env:
+        cors_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+    else:
+        cors_origins = ["https://demand-forecast-api.onrender.com"]
+
+# Add production middlewares (order matters — outer first)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(StructuredLogMiddleware)
 app.add_middleware(RateLimitMiddleware, max_requests=200, window_seconds=60)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=cors_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["X-API-Key", "X-Request-ID", "Authorization", "Content-Type"],
 )
 
 # Global exception handler
@@ -255,6 +267,7 @@ app.add_exception_handler(Exception, error_handler)
 # Mount Phase 2 routers
 app.include_router(dashboard_router)
 app.include_router(ws_router)
+app.include_router(metrics_router)
 
 
 # ═══════════════════════════════════════════════════════════
