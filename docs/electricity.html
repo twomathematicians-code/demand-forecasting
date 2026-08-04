@@ -358,6 +358,7 @@ const SIM_INTERVAL_MS = 2500;
 let ws = null;
 let connected = false;
 let simMode = false;
+let hfLoading = false; // guard against double-invocation of HuggingFace mode
 let simTimer = null;
 let simIndex = 0;
 let simData = null;
@@ -398,7 +399,7 @@ function connectWebSocket() {
 
     // Set a fallback timer — if WebSocket doesn't connect in 6s, go to HuggingFace mode
     const fallbackTimer = setTimeout(() => {
-        if (!connected && !simMode && ws) {
+        if (!connected && !simMode && !hfLoading && ws) {
             console.log('WebSocket timeout — switching to HuggingFace direct mode');
             ws.close();
             ws = null;
@@ -452,7 +453,7 @@ function connectWebSocket() {
         document.getElementById('btnDisconnect').classList.remove('btn-danger');
         document.getElementById('btnDisconnect').classList.add('btn-primary');
         // If never connected, go to HuggingFace mode immediately
-        if (!simMode && totalTicks === 0) {
+        if (!simMode && !hfLoading && totalTicks === 0) {
             startHuggingFaceMode();
             return;
         }
@@ -870,12 +871,19 @@ function updateTable(msg) {
 
 // ── HuggingFace Direct Data Loading ──
 async function startHuggingFaceMode() {
+    // Guard: prevent both ws.onclose and the 6s fallback timer from double-invoking
+    if (hfLoading || simMode) {
+        console.log('startHuggingFaceMode: already loading or in sim mode, skipping');
+        return;
+    }
+    hfLoading = true;
+    simMode = true; // set immediately so 6s timer's !simMode check blocks
+
     showLoading('Loading data from HuggingFace...');
     try {
         const data = await loadHuggingFaceData();
         if (data && data.length > 0) {
             simData = data;
-            simMode = true;
             startTimestamp = Date.now();
             computeSummaryFromData(data);
             showToast(`Loaded ${data.length.toLocaleString()} rows from HuggingFace!`, 'success');
@@ -895,11 +903,11 @@ async function startHuggingFaceMode() {
 
 async function loadHuggingFaceData() {
     // Load the most recent data from HuggingFace datasets-server API
-    // Each request returns 100 rows; we load the last 4800 rows (50 hours × 4 regions)
+    // Each request returns 100 rows; we load the last 1200 rows (~12.5 hours × 4 regions)
     const API = 'https://datasets-server.huggingface.co/rows';
     const params = 'dataset=SamuelM0422/Hourly-Electricity-Demand-Brazil-Dataset&config=default&split=train';
     const totalRows = 185280;
-    const rowsToLoad = 4800; // last ~50 hours
+    const rowsToLoad = 1200; // ~12.5 hours of data (reduced for faster load)
     const offset = totalRows - rowsToLoad;
     const batchSize = 100;
     const batches = Math.ceil(rowsToLoad / batchSize);
@@ -911,21 +919,31 @@ async function loadHuggingFaceData() {
         const url = `${API}?${params}&offset=${o}&length=${len}`;
         showLoading(`Loading data from HuggingFace... ${Math.round(((i+1)/batches)*100)}%`);
 
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json = await resp.json();
-
-        for (const item of json.rows) {
-            const r = item.row;
-            if (r.id_subsistema && r.din_instante && r.val_cargaenergiahomwmed != null) {
-                allRows.push({
-                    region: r.id_subsistema,
-                    timestamp: r.din_instante,
-                    demand_mw: r.val_cargaenergiahomwmed,
-                });
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) {
+                console.warn(`Batch ${i+1} failed: HTTP ${resp.status}, skipping`);
+                continue;
             }
+            const json = await resp.json();
+
+            for (const item of json.rows) {
+                const r = item.row;
+                if (r.id_subsistema && r.din_instante && r.val_cargaenergiahomwmed != null) {
+                    allRows.push({
+                        region: r.id_subsistema,
+                        timestamp: r.din_instante,
+                        demand_mw: r.val_cargaenergiahomwmed,
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn(`Batch ${i+1} error:`, e);
+            continue; // skip failed batches instead of aborting
         }
     }
+
+    if (allRows.length === 0) throw new Error('No data loaded from HuggingFace');
 
     // Sort by timestamp
     allRows.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
