@@ -22,6 +22,8 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.api.dashboard import router as dashboard_router
@@ -194,6 +196,16 @@ app.add_exception_handler(Exception, error_handler)
 app.include_router(dashboard_router)
 app.include_router(ws_router)
 app.include_router(metrics_router)
+
+# Serve the dashboard HTML at root /
+STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "static"
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    @app.get("/", tags=["Dashboard"], include_in_schema=False)
+    async def serve_dashboard():
+        """Serve the interactive browser dashboard."""
+        return FileResponse(str(STATIC_DIR / "index.html"))
 
 
 # ═══════════════════════════════════════════════════════════
