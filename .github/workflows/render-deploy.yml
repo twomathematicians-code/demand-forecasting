@@ -1,0 +1,38 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "README.md"
+      - ".render-trigger"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger Render Deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "⚠️ RENDER_DEPLOY_HOOK secret not set"
+            echo "Go to Render Dashboard → your service → Settings → Deploy Hook"
+            echo "Copy the URL and add it as a GitHub secret named RENDER_DEPLOY_HOOK"
+            echo "https://github.com/twomathematicians-code/demand-forecasting/settings/secrets/actions"
+            exit 1
+          fi
+          echo "Triggering Render deploy..."
+          HTTP_CODE=$(curl -s -o /tmp/render-deploy-response.json -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+          echo "HTTP Status: $HTTP_CODE"
+          cat /tmp/render-deploy-response.json
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Deploy triggered successfully"
+          elif [ "$HTTP_CODE" -eq 202 ]; then
+            echo "✅ Deploy queued (another deploy in progress)"
+          else
+            echo "❌ Deploy trigger failed"
+            exit 1
+          fi
