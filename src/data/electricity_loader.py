@@ -189,16 +189,27 @@ class ElectricityDataLoader:
         return predictions
 
     def _load(self) -> None:
-        """Load the dataset from HuggingFace (called once, cached)."""
+        """Load the dataset from HuggingFace (called once, cached).
+
+        Downloads the parquet file via HTTP using httpx (already in deps)
+        and reads it with pandas/pyarrow. No heavy datasets library needed.
+        """
         with self._lock:
             if self._loaded:
                 return
             try:
-                log.info("Loading electricity dataset from HuggingFace: %s", DATASET_ID)
-                from datasets import load_dataset
+                import io
+                import httpx
 
-                ds = load_dataset(DATASET_ID, split="train")
-                df = ds.to_pandas()
+                url = (
+                    "https://huggingface.co/datasets/"
+                    f"{DATASET_ID}/resolve/main/data/train-00000-of-00001.parquet"
+                )
+                log.info("Downloading electricity dataset from HuggingFace: %s", url)
+                resp = httpx.get(url, follow_redirects=True, timeout=60.0)
+                resp.raise_for_status()
+
+                df = pd.read_parquet(io.BytesIO(resp.content))
 
                 # Rename and standardize columns
                 df = df.rename(columns={

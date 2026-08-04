@@ -18,7 +18,7 @@ joblib>=1.4
 asyncpg>=0.29
 sqlalchemy>=2.0
 alembic>=1.13
-datasets>=2.18
+pyarrow>=14.0
 # torch — skip on free tier (800MB, CNN-LSTM disabled)
 # aiokafka — skip on free tier
 # evidently — skip on free tier
