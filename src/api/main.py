@@ -330,7 +330,7 @@ async def electricity_forecast(hours: int = Query(default=24, ge=1, le=168)):
             demand_mw = round(base_demand * hour_factor / 10, 1)
             predictions.append(PriceForecastPoint(
                 timestamp=(datetime.now() + timedelta(hours=i + 1)).isoformat(),
-                price_per_kwh=round(0.08 + 0.27 * (demand_mw / max(1, max(p["demand_mw"] for p in predictions or [PriceForecastPoint(timestamp="", price_per_kwh=0, demand_mw=1)]))), 4) if predictions else 0.15,
+                price_per_kwh=0.0,  # overwritten below after max_demand is known
                 demand_mw=demand_mw,
             ))
         # Fix price calculation (simplify)
