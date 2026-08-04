@@ -348,14 +348,22 @@ body {
 
 <script>
 // ── Config ──
+const API_ORIGIN = 'https://demand-forecast-api-s37z.onrender.com';
 const REGIONS = ['N', 'NE', 'S', 'SE'];
 const REGION_COLORS_MAP = { N: '#22c55e', NE: '#eab308', S: '#3b82f6', SE: '#a855f7' };
-const MAX_CHART_POINTS = 60; // sliding window for live chart
+const MAX_CHART_POINTS = 60;
 const MAX_TABLE_ROWS = 20;
+const SIM_INTERVAL_MS = 2500;
 
 let ws = null;
 let connected = false;
+let simMode = false;
+let simTimer = null;
+let simIndex = 0;
+let simData = null;
+let wsAttempted = false;
 let totalTicks = 0;
+let startTimestamp = null;
 let activeRegions = new Set(REGIONS);
 
 // Chart instances
@@ -378,33 +386,47 @@ const maxExpectedValues = { N: 8000, NE: 15000, S: 16000, SE: 50000 };
 function init() {
     initLiveChart();
     initBarChart();
-    loadSummary();
     connectWebSocket();
 }
 
 // ── WebSocket ──
 function connectWebSocket() {
-    const API_ORIGIN = 'https://demand-forecast-api-s37z.onrender.com';
     const protocol = 'wss:';
     const url = `${protocol}//${API_ORIGIN.replace(/^https?:\/\//, '')}/ws/electricity/live`;
 
     showLoading('Connecting to live data stream...');
 
+    // Set a fallback timer — if WebSocket doesn't connect in 6s, go to HuggingFace mode
+    const fallbackTimer = setTimeout(() => {
+        if (!connected && !simMode && ws) {
+            console.log('WebSocket timeout — switching to HuggingFace direct mode');
+            ws.close();
+            ws = null;
+            startHuggingFaceMode();
+        }
+    }, 6000);
+
     try {
         ws = new WebSocket(url);
     } catch (e) {
+        clearTimeout(fallbackTimer);
         showToast('WebSocket error: ' + e.message, 'error');
         hideLoading();
+        startHuggingFaceMode();
         return;
     }
 
     ws.onopen = () => {
+        clearTimeout(fallbackTimer);
         connected = true;
+        wsAttempted = true;
         hideLoading();
         document.getElementById('statusPill').classList.add('live');
         document.getElementById('statusText').textContent = 'LIVE';
         document.getElementById('btnDisconnect').style.display = 'inline-flex';
         showToast('Connected to live electricity stream!', 'success');
+        // Also load summary from API
+        loadSummary();
     };
 
     ws.onmessage = (event) => {
@@ -421,15 +443,22 @@ function connectWebSocket() {
     };
 
     ws.onclose = () => {
+        clearTimeout(fallbackTimer);
         connected = false;
+        wsAttempted = true;
         document.getElementById('statusPill').classList.remove('live');
         document.getElementById('statusText').textContent = 'Disconnected';
         document.getElementById('btnDisconnect').textContent = '▶ Reconnect';
         document.getElementById('btnDisconnect').classList.remove('btn-danger');
         document.getElementById('btnDisconnect').classList.add('btn-primary');
+        // If never connected, go to HuggingFace mode immediately
+        if (!simMode && totalTicks === 0) {
+            startHuggingFaceMode();
+            return;
+        }
         // Auto-reconnect after 5s
         setTimeout(() => {
-            if (!connected) {
+            if (!connected && !simMode) {
                 connectWebSocket();
                 document.getElementById('btnDisconnect').textContent = '⏹ Stop';
                 document.getElementById('btnDisconnect').classList.add('btn-danger');
@@ -440,16 +469,26 @@ function connectWebSocket() {
 
     ws.onerror = (e) => {
         console.error('WebSocket error:', e);
-        hideLoading();
+        clearTimeout(fallbackTimer);
     };
 }
 
 function toggleStream() {
-    if (connected && ws) {
+    if (simMode) {
+        stopSimulation();
+        showToast('Stream paused', 'info');
+        // Try reconnecting to WebSocket
+        simMode = false;
+        connectWebSocket();
+    } else if (connected && ws) {
         ws.close();
         showToast('Stream paused', 'info');
     } else {
-        connectWebSocket();
+        if (simData) {
+            startSimulation();
+        } else {
+            connectWebSocket();
+        }
     }
 }
 
@@ -661,101 +700,119 @@ function updateBarChart(data) {
 
 // ── Forecast Chart ──
 async function loadForecast() {
+    // Try API first, fall back to in-browser computation
     try {
-        const res = await fetch(`${API_ORIGIN}/api/v1/electricity/predict?region=SE&hours=24&confidence=0.9`);
-        const json = await res.json();
-        const predictions = json.predictions || [];
-
-        if (predictions.length === 0) {
-            showToast('No forecast data available', 'error');
-            return;
+        if (connected) {
+            const res = await fetch(`${API_ORIGIN}/api/v1/electricity/predict?region=SE&hours=24&confidence=0.9`);
+            if (res.ok) {
+                const json = await res.json();
+                const predictions = json.predictions || [];
+                if (predictions.length > 0) {
+                    renderForecastChart(predictions);
+                    showToast('24h forecast loaded from API!', 'success');
+                    return;
+                }
+            }
         }
-
-        const labels = predictions.map(p => formatTimeLabel(p.timestamp));
-        const values = predictions.map(p => p.predicted_mw);
-        const upper = predictions.map(p => p.upper_bound);
-        const lower = predictions.map(p => p.lower_bound);
-
-        if (forecastChart) forecastChart.destroy();
-
-        const ctx = document.getElementById('forecastChart').getContext('2d');
-        forecastChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Forecast',
-                        data: values,
-                        borderColor: '#a855f7',
-                        backgroundColor: 'rgba(168,85,247,0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 3,
-                        pointBackgroundColor: '#a855f7',
-                        borderWidth: 2,
-                    },
-                    {
-                        label: 'Upper (90% CI)',
-                        data: upper,
-                        borderColor: 'rgba(34,197,94,0.4)',
-                        fill: '+1',
-                        tension: 0.4,
-                        pointRadius: 0,
-                        borderWidth: 1,
-                        borderDash: [4, 4],
-                    },
-                    {
-                        label: 'Lower (90% CI)',
-                        data: lower,
-                        borderColor: 'rgba(239,68,68,0.4)',
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        borderWidth: 1,
-                        borderDash: [4, 4],
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: { labels: { color: '#94a3b8', usePointStyle: true, font: { size: 11 } } },
-                    tooltip: {
-                        backgroundColor: '#1e293b',
-                        borderColor: '#475569',
-                        borderWidth: 1,
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#94a3b8',
-                        padding: 12,
-                        callbacks: {
-                            label: (ctx) => `${ctx.dataset.label}: ${formatMW(ctx.parsed.y)} MW`
-                        }
-                    },
-                },
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(71,85,105,0.3)' },
-                        ticks: { color: '#94a3b8', maxRotation: 45, maxTicksLimit: 12, font: { size: 10 } },
-                    },
-                    y: {
-                        grid: { color: 'rgba(71,85,105,0.3)' },
-                        ticks: { color: '#94a3b8', callback: v => formatMW(v) },
-                    },
-                },
-            },
-        });
-
-        showToast('24h forecast loaded!', 'success');
     } catch (e) {
-        showToast('Forecast error: ' + e.message, 'error');
+        console.warn('API forecast failed, using in-browser fallback:', e);
     }
+
+    // In-browser fallback
+    computeForecastInBrowser();
+}
+
+function renderForecastChart(predictions) {
+    if (predictions.length === 0) {
+        showToast('No forecast data available', 'error');
+        return;
+    }
+
+    const labels = predictions.map(p => formatTimeLabel(p.timestamp));
+    const values = predictions.map(p => p.predicted_mw);
+    const upper = predictions.map(p => p.upper_bound);
+    const lower = predictions.map(p => p.lower_bound);
+
+    if (forecastChart) forecastChart.destroy();
+
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    forecastChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Forecast',
+                    data: values,
+                    borderColor: '#a855f7',
+                    backgroundColor: 'rgba(168,85,247,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#a855f7',
+                    borderWidth: 2,
+                },
+                {
+                    label: 'Upper (90% CI)',
+                    data: upper,
+                    borderColor: 'rgba(34,197,94,0.4)',
+                    fill: '+1',
+                    tension: 0.4,
+                    pointRadius: 0,
+                    borderWidth: 1,
+                    borderDash: [4, 4],
+                },
+                {
+                    label: 'Lower (90% CI)',
+                    data: lower,
+                    borderColor: 'rgba(239,68,68,0.4)',
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    borderWidth: 1,
+                    borderDash: [4, 4],
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#94a3b8', usePointStyle: true, font: { size: 11 } } },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#475569',
+                    borderWidth: 1,
+                    titleColor: '#f1f5f9',
+                    bodyColor: '#94a3b8',
+                    padding: 12,
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${formatMW(ctx.parsed.y)} MW`
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(71,85,105,0.3)' },
+                    ticks: { color: '#94a3b8', maxRotation: 45, maxTicksLimit: 12, font: { size: 10 } },
+                },
+                y: {
+                    grid: { color: 'rgba(71,85,105,0.3)' },
+                    ticks: { color: '#94a3b8', callback: v => formatMW(v) },
+                },
+            },
+        },
+    });
+
+    showToast('24h forecast loaded!', 'success');
 }
 
 // ── Summary ──
 async function loadSummary() {
+    // In sim mode, summary is already computed by computeSummaryFromData()
+    if (simMode || !connected) return;
+
     try {
         const res = await fetch(`${API_ORIGIN}/api/v1/electricity/summary`);
         const json = await res.json();
@@ -809,6 +866,183 @@ function updateTable(msg) {
         `;
         tbody.appendChild(tr);
     }
+}
+
+// ── HuggingFace Direct Data Loading ──
+async function startHuggingFaceMode() {
+    showLoading('Loading data from HuggingFace...');
+    try {
+        const data = await loadHuggingFaceData();
+        if (data && data.length > 0) {
+            simData = data;
+            simMode = true;
+            startTimestamp = Date.now();
+            computeSummaryFromData(data);
+            showToast(`Loaded ${data.length.toLocaleString()} rows from HuggingFace!`, 'success');
+            startSimulation();
+            // Load forecast after a short delay to let the chart stabilize
+            setTimeout(loadForecast, 1500);
+        } else {
+            showToast('No data received from HuggingFace', 'error');
+            hideLoading();
+        }
+    } catch (e) {
+        console.error('HuggingFace load failed:', e);
+        showToast('Data load failed: ' + e.message, 'error');
+        hideLoading();
+    }
+}
+
+async function loadHuggingFaceData() {
+    // Load the most recent data from HuggingFace datasets-server API
+    // Each request returns 100 rows; we load the last 4800 rows (50 hours × 4 regions)
+    const API = 'https://datasets-server.huggingface.co/rows';
+    const params = 'dataset=SamuelM0422/Hourly-Electricity-Demand-Brazil-Dataset&config=default&split=train';
+    const totalRows = 185280;
+    const rowsToLoad = 4800; // last ~50 hours
+    const offset = totalRows - rowsToLoad;
+    const batchSize = 100;
+    const batches = Math.ceil(rowsToLoad / batchSize);
+    const allRows = [];
+
+    for (let i = 0; i < batches; i++) {
+        const o = offset + i * batchSize;
+        const len = Math.min(batchSize, rowsToLoad - i * batchSize);
+        const url = `${API}?${params}&offset=${o}&length=${len}`;
+        showLoading(`Loading data from HuggingFace... ${Math.round(((i+1)/batches)*100)}%`);
+
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+
+        for (const item of json.rows) {
+            const r = item.row;
+            if (r.id_subsistema && r.din_instante && r.val_cargaenergiahomwmed != null) {
+                allRows.push({
+                    region: r.id_subsistema,
+                    timestamp: r.din_instante,
+                    demand_mw: r.val_cargaenergiahomwmed,
+                });
+            }
+        }
+    }
+
+    // Sort by timestamp
+    allRows.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    return allRows;
+}
+
+function startSimulation() {
+    if (!simData || simData.length === 0) return;
+    document.getElementById('statusPill').classList.add('live');
+    document.getElementById('statusText').textContent = 'SIMULATED';
+    document.getElementById('btnDisconnect').style.display = 'inline-flex';
+    hideLoading();
+
+    // Tick every 2.5 seconds, cycling through the data
+    simTimer = setInterval(() => {
+        // Group rows by timestamp (each tick = 4 rows, one per region)
+        const ts = simData[simIndex].timestamp;
+        const data = {};
+        let total = 0;
+
+        while (simIndex < simData.length && simData[simIndex].timestamp === ts) {
+            const row = simData[simIndex];
+            data[row.region] = { demand_mw: row.demand_mw };
+            total += row.demand_mw;
+            simIndex++;
+        }
+
+        // Cycle back if we reach the end
+        if (simIndex >= simData.length) simIndex = 0;
+
+        const elapsed = (Date.now() - startTimestamp) / 1000;
+
+        const msg = {
+            type: 'tick',
+            tick: totalTicks + 1,
+            timestamp: ts,
+            data: data,
+            totals: { national_mw: Math.round(total) },
+            elapsed_s: elapsed,
+        };
+
+        handleTick(msg);
+    }, SIM_INTERVAL_MS);
+}
+
+function stopSimulation() {
+    if (simTimer) {
+        clearInterval(simTimer);
+        simTimer = null;
+    }
+    simMode = false;
+    document.getElementById('statusPill').classList.remove('live');
+    document.getElementById('statusText').textContent = 'Paused';
+}
+
+function computeSummaryFromData(data) {
+    // Compute summary stats from loaded HuggingFace data
+    const regionStats = {};
+    for (const r of REGIONS) {
+        const rows = data.filter(d => d.region === r);
+        const demands = rows.map(d => d.demand_mw);
+        regionStats[r] = {
+            current_mw: demands.length > 0 ? demands[demands.length - 1] : 0,
+            peak_mw: Math.max(...demands),
+            avg_mw: demands.reduce((a, b) => a + b, 0) / (demands.length || 1),
+        };
+        peakValues[r] = regionStats[r].peak_mw;
+        document.getElementById(`peakVal-${r}`).textContent = formatMW(peakValues[r]);
+    }
+
+    const allDemands = data.map(d => d.demand_mw);
+    document.getElementById('statAvg').textContent = formatMW(allDemands.reduce((a, b) => a + b, 0) / allDemands.length);
+    document.getElementById('statPeak').textContent = formatMW(Math.max(...allDemands));
+}
+
+// ── Forecast (in-browser fallback) ──
+function computeForecastInBrowser() {
+    if (!simData || simData.length === 0) return;
+
+    // Compute a simple forecast for SE region using linear regression
+    const seData = simData.filter(d => d.region === 'SE').slice(-168); // last 7 days
+    if (seData.length < 24) return;
+
+    const n = seData.length;
+    const demands = seData.map(d => d.demand_mw);
+
+    // Linear regression
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let i = 0; i < n; i++) {
+        sumX += i;
+        sumY += demands[i];
+        sumXY += i * demands[i];
+        sumX2 += i * i;
+    }
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Compute residuals for confidence intervals
+    const residuals = demands.map((y, i) => y - (slope * i + intercept));
+    const stdDev = Math.sqrt(residuals.reduce((s, r) => s + r * r, 0) / (n - 2));
+
+    // Generate 24h forecast
+    const predictions = [];
+    const lastTs = new Date(seData[n - 1].timestamp);
+    const zFactor = 1.645; // 90% CI
+
+    for (let h = 1; h <= 24; h++) {
+        const predicted = Math.max(0, slope * (n + h - 1) + intercept);
+        predictions.push({
+            timestamp: new Date(lastTs.getTime() + h * 3600000).toISOString(),
+            predicted_mw: Math.round(predicted * 10) / 10,
+            upper_bound: Math.round((predicted + zFactor * stdDev) * 10) / 10,
+            lower_bound: Math.max(0, Math.round((predicted - zFactor * stdDev) * 10) / 10),
+        });
+    }
+
+    renderForecastChart(predictions);
 }
 
 // ── Formatters ──
