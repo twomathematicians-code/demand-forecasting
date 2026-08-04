@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.api.dashboard import router as dashboard_router
+from src.api.electricity_router import router as electricity_router
 from src.api.websocket import router as ws_router
 from src.api.middleware import (
     RateLimitMiddleware,
@@ -194,6 +195,7 @@ app.add_exception_handler(Exception, error_handler)
 
 # Mount Phase 2 routers
 app.include_router(dashboard_router)
+app.include_router(electricity_router)
 app.include_router(ws_router)
 app.include_router(metrics_router)
 
@@ -206,6 +208,11 @@ if STATIC_DIR.is_dir():
     async def serve_dashboard():
         """Serve the interactive browser dashboard."""
         return FileResponse(str(STATIC_DIR / "index.html"))
+
+    @app.get("/electricity", tags=["Dashboard"], include_in_schema=False)
+    async def serve_electricity_dashboard():
+        """Serve the live electricity dashboard."""
+        return FileResponse(str(STATIC_DIR / "electricity.html"))
 
 
 # ═══════════════════════════════════════════════════════════

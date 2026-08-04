@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ Live Electricity Dashboard — Brazil</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --red: #ef4444;
+    --orange: #f97316;
+    --region-n: #22c55e;
+    --region-ne: #eab308;
+    --region-s: #3b82f6;
+    --region-se: #a855f7;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+}
+.container { max-width: 1440px; margin: 0 auto; padding: 16px 20px 40px; }
+
+/* Header */
+.header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header h1 { font-size: 1.4rem; font-weight: 700; }
+.header h1 span { color: var(--yellow); }
+.header .subtitle { color: var(--text2); font-size: 0.85rem; }
+.status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+    background: rgba(239,68,68,0.15); color: var(--red);
+}
+.status-pill.live { background: rgba(34,197,94,0.15); color: var(--green); }
+.status-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Cards */
+.card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+    font-size: 0.9rem; font-weight: 600; color: var(--text2);
+    margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* Grid */
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 16px; }
+
+/* Gauge cards */
+.gauge-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; text-align: center;
+    position: relative; overflow: hidden;
+}
+.gauge-card .region-name { font-size: 0.85rem; color: var(--text2); font-weight: 600; margin-bottom: 4px; }
+.gauge-card .gauge-value {
+    font-size: 2.2rem; font-weight: 800; line-height: 1.2;
+    transition: color 0.3s;
+}
+.gauge-card .gauge-unit { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+.gauge-card .gauge-bar {
+    height: 4px; border-radius: 2px; margin-top: 12px;
+    background: var(--surface2); overflow: hidden;
+}
+.gauge-card .gauge-fill {
+    height: 100%; border-radius: 2px; transition: width 0.5s ease;
+}
+.gauge-card .peak-label {
+    font-size: 0.7rem; color: var(--text2); margin-top: 6px;
+}
+
+/* Chart */
+.chart-wrapper { position: relative; height: 320px; }
+.chart-wrapper-tall { position: relative; height: 260px; }
+
+/* Stats cards */
+.stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px;
+}
+.stat-card .stat-label { font-size: 0.8rem; color: var(--text2); font-weight: 500; }
+.stat-card .stat-value { font-size: 1.6rem; font-weight: 800; margin-top: 2px; }
+.stat-card .stat-sub { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+
+/* Data table */
+.data-table {
+    width: 100%; border-collapse: collapse; font-size: 0.8rem;
+}
+.data-table th {
+    text-align: left; padding: 8px 10px; color: var(--text2);
+    border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.data-table td {
+    padding: 7px 10px; border-bottom: 1px solid rgba(51,65,85,0.4);
+    font-variant-numeric: tabular-nums;
+}
+.data-table tr:hover { background: rgba(30,41,59,0.5); }
+.data-table .region-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.7rem; font-weight: 600;
+}
+
+/* Controls */
+.controls { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+    padding: 8px 18px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text); cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+}
+.btn:hover { background: rgba(59,130,246,0.2); border-color: var(--blue); }
+.btn.active { background: rgba(59,130,246,0.3); border-color: var(--blue); color: var(--blue); }
+.btn-primary {
+    background: var(--blue); border-color: var(--blue); color: white;
+}
+.btn-primary:hover { background: #2563eb; }
+.btn-danger { background: rgba(239,68,68,0.2); border-color: var(--red); color: var(--red); }
+
+/* Toast */
+.toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 12px 20px; border-radius: 8px; font-size: 0.85rem;
+    transform: translateY(100px); opacity: 0; transition: all 0.3s;
+    z-index: 1000; font-weight: 500;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-success { background: rgba(34,197,94,0.9); color: white; }
+.toast-error { background: rgba(239,68,68,0.9); color: white; }
+.toast-info { background: rgba(59,130,246,0.9); color: white; }
+
+/* Loading overlay */
+.loading-overlay {
+    display: none; position: fixed; inset: 0; z-index: 999;
+    background: rgba(0,0,0,0.7); align-items: center; justify-content: center;
+}
+.loading-overlay.active { display: flex; }
+.loading-box {
+    background: var(--surface); padding: 32px 48px; border-radius: 12px;
+    text-align: center; border: 1px solid var(--border);
+}
+.spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+    .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .container { padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading">
+    <div class="loading-box">
+        <div class="spinner"></div>
+        <div id="loadingText">Loading electricity data from HuggingFace...</div>
+        <div style="color:var(--text2);font-size:0.8rem;margin-top:8px;">First load may take 10-20 seconds</div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+    <div class="header-left">
+        <div>
+            <h1>⚡ Live <span>Electricity</span> Dashboard</h1>
+            <div class="subtitle">Brazilian Power Demand — 4 Regions — Real-Time Streaming from HuggingFace</div>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div class="status-pill" id="statusPill">
+            <span class="dot"></span>
+            <span id="statusText">Connecting...</span>
+        </div>
+        <div style="text-align:right;">
+            <div style="font-size:0.8rem;color:var(--text2);">Data Points</div>
+            <div style="font-size:1.1rem;font-weight:700;" id="tickCounter">0</div>
+        </div>
+    </div>
+</div>
+
+<!-- Region Gauge Cards -->
+<div class="grid-4" id="gaugeCards">
+    <div class="gauge-card" id="gauge-N">
+        <div class="region-name">Norte (N)</div>
+        <div class="gauge-value" style="color:var(--region-n);" id="gaugeVal-N">—</div>
+        <div class="gauge-unit">MW (Megawatts)</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="gaugeFill-N" style="background:var(--region-n);width:0%"></div></div>
+        <div class="peak-label">Peak: <span id="peakVal-N">—</span> MW</div>
+    </div>
+    <div class="gauge-card" id="gauge-NE">
+        <div class="region-name">Nordeste (NE)</div>
+        <div class="gauge-value" style="color:var(--region-ne);" id="gaugeVal-NE">—</div>
+        <div class="gauge-unit">MW (Megawatts)</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="gaugeFill-NE" style="background:var(--region-ne);width:0%"></div></div>
+        <div class="peak-label">Peak: <span id="peakVal-NE">—</span> MW</div>
+    </div>
+    <div class="gauge-card" id="gauge-S">
+        <div class="region-name">Sul (S)</div>
+        <div class="gauge-value" style="color:var(--region-s);" id="gaugeVal-S">—</div>
+        <div class="gauge-unit">MW (Megawatts)</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="gaugeFill-S" style="background:var(--region-s);width:0%"></div></div>
+        <div class="peak-label">Peak: <span id="peakVal-S">—</span> MW</div>
+    </div>
+    <div class="gauge-card" id="gauge-SE">
+        <div class="region-name">Sudeste (SE)</div>
+        <div class="gauge-value" style="color:var(--region-se);" id="gaugeVal-SE">—</div>
+        <div class="gauge-unit">MW (Megawatts)</div>
+        <div class="gauge-bar"><div class="gauge-fill" id="gaugeFill-SE" style="background:var(--region-se);width:0%"></div></div>
+        <div class="peak-label">Peak: <span id="peakVal-SE">—</span> MW</div>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="grid-4">
+    <div class="stat-card">
+        <div class="stat-label">🔋 National Total</div>
+        <div class="stat-value" id="statNational">—</div>
+        <div class="stat-sub">MW across all regions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">📊 Average Demand</div>
+        <div class="stat-value" id="statAvg">—</div>
+        <div class="stat-sub">MW (national average)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">📈 Peak National</div>
+        <div class="stat-value" id="statPeak" style="color:var(--orange);">—</div>
+        <div class="stat-sub">MW (all-time high)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">🕐 Stream Time</div>
+        <div class="stat-value" id="statTime">00:00</div>
+        <div class="stat-sub">seconds elapsed</div>
+    </div>
+</div>
+
+<!-- Main Real-Time Chart -->
+<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:0;">📊 Real-Time Demand (All Regions)</div>
+        <div class="controls">
+            <button class="btn active" id="btnAll" onclick="toggleRegion('all')">All</button>
+            <button class="btn" id="btn-N" onclick="toggleRegion('N')">Norte</button>
+            <button class="btn" id="btn-NE" onclick="toggleRegion('NE')">Nordeste</button>
+            <button class="btn" id="btn-S" onclick="toggleRegion('S')">Sul</button>
+            <button class="btn" id="btn-SE" onclick="toggleRegion('SE')">Sudeste</button>
+        </div>
+    </div>
+    <div class="chart-wrapper">
+        <canvas id="liveChart"></canvas>
+    </div>
+</div>
+
+<!-- Forecast + Bar Chart -->
+<div class="grid-2">
+    <!-- 24h Forecast -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div class="card-title" style="margin-bottom:0;">🔮 24h Forecast (SE Region)</div>
+            <button class="btn btn-primary" onclick="loadForecast()">Load Forecast</button>
+        </div>
+        <div class="chart-wrapper-tall">
+            <canvas id="forecastChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Regional Bar Comparison -->
+    <div class="card">
+        <div class="card-title">📉 Regional Comparison</div>
+        <div class="chart-wrapper-tall">
+            <canvas id="barChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Data Table -->
+<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:0;">📋 Live Data Feed (Last 20 Ticks)</div>
+        <button class="btn btn-danger" id="btnDisconnect" onclick="toggleStream()" style="display:none;">⏹ Stop</button>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Timestamp</th>
+                    <th>Norte (MW)</th>
+                    <th>Nordeste (MW)</th>
+                    <th>Sul (MW)</th>
+                    <th>Sudeste (MW)</th>
+                    <th>National Total</th>
+                </tr>
+            </thead>
+            <tbody id="dataTableBody">
+                <tr><td colspan="7" style="text-align:center;color:var(--text2);padding:24px;">Waiting for data stream...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;padding:20px 0;color:var(--text2);font-size:0.75rem;">
+    ⚡ Data source: <a href="https://huggingface.co/datasets/SamuelM0422/Hourly-Electricity-Demand-Brazil-Dataset" target="_blank" style="color:var(--blue);">SamuelM0422/Hourly-Electricity-Demand-Brazil-Dataset</a> on HuggingFace
+    &nbsp;|&nbsp; Dashboard by ZCode &nbsp;|&nbsp; Render Free Tier
+</div>
+
+</div>
+
+<script>
+// ── Config ──
+const REGIONS = ['N', 'NE', 'S', 'SE'];
+const REGION_COLORS_MAP = { N: '#22c55e', NE: '#eab308', S: '#3b82f6', SE: '#a855f7' };
+const MAX_CHART_POINTS = 60; // sliding window for live chart
+const MAX_TABLE_ROWS = 20;
+
+let ws = null;
+let connected = false;
+let totalTicks = 0;
+let activeRegions = new Set(REGIONS);
+
+// Chart instances
+let liveChart = null;
+let forecastChart = null;
+let barChart = null;
+
+// Data history for charts
+const chartLabels = [];
+const chartData = { N: [], NE: [], S: [], SE: [] };
+
+// Table history
+const tableHistory = [];
+
+// Peak tracking
+const peakValues = { N: 0, NE: 0, S: 0, SE: 0 };
+const maxExpectedValues = { N: 8000, NE: 15000, S: 16000, SE: 50000 };
+
+// ── Initialize ──
+function init() {
+    initLiveChart();
+    initBarChart();
+    loadSummary();
+    connectWebSocket();
+}
+
+// ── WebSocket ──
+function connectWebSocket() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${protocol}//${location.host}/ws/electricity/live`;
+
+    showLoading('Connecting to live data stream...');
+
+    try {
+        ws = new WebSocket(url);
+    } catch (e) {
+        showToast('WebSocket error: ' + e.message, 'error');
+        hideLoading();
+        return;
+    }
+
+    ws.onopen = () => {
+        connected = true;
+        hideLoading();
+        document.getElementById('statusPill').classList.add('live');
+        document.getElementById('statusText').textContent = 'LIVE';
+        document.getElementById('btnDisconnect').style.display = 'inline-flex';
+        showToast('Connected to live electricity stream!', 'success');
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'tick') {
+                handleTick(msg);
+            } else if (msg.type === 'error') {
+                showToast(msg.message, 'error');
+            }
+        } catch (e) {
+            console.error('WebSocket parse error:', e);
+        }
+    };
+
+    ws.onclose = () => {
+        connected = false;
+        document.getElementById('statusPill').classList.remove('live');
+        document.getElementById('statusText').textContent = 'Disconnected';
+        document.getElementById('btnDisconnect').textContent = '▶ Reconnect';
+        document.getElementById('btnDisconnect').classList.remove('btn-danger');
+        document.getElementById('btnDisconnect').classList.add('btn-primary');
+        // Auto-reconnect after 5s
+        setTimeout(() => {
+            if (!connected) {
+                connectWebSocket();
+                document.getElementById('btnDisconnect').textContent = '⏹ Stop';
+                document.getElementById('btnDisconnect').classList.add('btn-danger');
+                document.getElementById('btnDisconnect').classList.remove('btn-primary');
+            }
+        }, 5000);
+    };
+
+    ws.onerror = (e) => {
+        console.error('WebSocket error:', e);
+        hideLoading();
+    };
+}
+
+function toggleStream() {
+    if (connected && ws) {
+        ws.close();
+        showToast('Stream paused', 'info');
+    } else {
+        connectWebSocket();
+    }
+}
+
+// ── Handle Incoming Tick ──
+function handleTick(msg) {
+    totalTicks++;
+    document.getElementById('tickCounter').textContent = totalTicks.toLocaleString();
+
+    // Update gauges
+    const data = msg.data || {};
+    for (const r of REGIONS) {
+        if (data[r]) {
+            const val = data[r].demand_mw;
+            document.getElementById(`gaugeVal-${r}`).textContent = formatMW(val);
+            // Gauge fill percentage
+            const pct = Math.min(100, (val / maxExpectedValues[r]) * 100);
+            document.getElementById(`gaugeFill-${r}`).style.width = pct + '%';
+            // Track peak
+            if (val > peakValues[r]) {
+                peakValues[r] = val;
+                document.getElementById(`peakVal-${r}`).textContent = formatMW(val);
+            }
+        }
+    }
+
+    // Update stats
+    const totals = msg.totals || {};
+    document.getElementById('statNational').textContent = formatMW(totals.national_mw || 0);
+    document.getElementById('statTime').textContent = formatDuration(msg.elapsed_s || 0);
+
+    // Update live chart
+    updateLiveChart(msg);
+
+    // Update table
+    updateTable(msg);
+
+    // Update bar chart
+    updateBarChart(data);
+}
+
+// ── Live Chart ──
+function initLiveChart() {
+    const ctx = document.getElementById('liveChart').getContext('2d');
+    liveChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: REGIONS.map(r => ({
+                label: r,
+                data: [],
+                borderColor: REGION_COLORS_MAP[r],
+                backgroundColor: REGION_COLORS_MAP[r] + '15',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 2,
+                pointHoverRadius: 5,
+                borderWidth: 2,
+                hidden: false,
+            })),
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    labels: { color: '#94a3b8', usePointStyle: true, padding: 16, font: { size: 12 } }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#475569',
+                    borderWidth: 1,
+                    titleColor: '#f1f5f9',
+                    bodyColor: '#94a3b8',
+                    padding: 12,
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${formatMW(ctx.parsed.y)} MW`
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(71,85,105,0.3)' },
+                    ticks: { color: '#94a3b8', maxRotation: 45, maxTicksLimit: 12, font: { size: 10 } },
+                },
+                y: {
+                    grid: { color: 'rgba(71,85,105,0.3)' },
+                    ticks: { color: '#94a3b8', callback: v => formatMW(v) },
+                    beginAtZero: false,
+                },
+            },
+        },
+    });
+}
+
+function updateLiveChart(msg) {
+    const label = formatTimeLabel(msg.timestamp);
+    chartLabels.push(label);
+
+    for (const r of REGIONS) {
+        const val = (msg.data && msg.data[r]) ? msg.data[r].demand_mw : null;
+        chartData[r].push(val);
+    }
+
+    // Trim to sliding window
+    while (chartLabels.length > MAX_CHART_POINTS) {
+        chartLabels.shift();
+        for (const r of REGIONS) chartData[r].shift();
+    }
+
+    // Update chart
+    liveChart.data.labels = chartLabels;
+    for (let i = 0; i < REGIONS.length; i++) {
+        liveChart.data.datasets[i].data = chartData[REGIONS[i]];
+    }
+    liveChart.update('none'); // no animation for perf
+}
+
+function toggleRegion(region) {
+    // Toggle active region
+    if (region === 'all') {
+        REGIONS.forEach(r => activeRegions.add(r));
+        REGIONS.forEach(r => document.getElementById(`btn-${r}`).classList.remove('active'));
+        document.getElementById('btnAll').classList.add('active');
+    } else {
+        if (activeRegions.has(region)) {
+            activeRegions.delete(region);
+            document.getElementById(`btn-${region}`).classList.remove('active');
+        } else {
+            activeRegions.add(region);
+            document.getElementById(`btn-${region}`).classList.add('active');
+        }
+        // If all active, highlight "All" button
+        if (activeRegions.size === REGIONS.length) {
+            document.getElementById('btnAll').classList.add('active');
+        } else {
+            document.getElementById('btnAll').classList.remove('active');
+        }
+    }
+
+    // Update chart visibility
+    for (let i = 0; i < REGIONS.length; i++) {
+        liveChart.data.datasets[i].hidden = !activeRegions.has(REGIONS[i]);
+    }
+    liveChart.update();
+}
+
+// ── Bar Chart ──
+function initBarChart() {
+    const ctx = document.getElementById('barChart').getContext('2d');
+    barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Norte', 'Nordeste', 'Sul', 'Sudeste'],
+            datasets: [{
+                label: 'Current Demand (MW)',
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    'rgba(34,197,94,0.6)',
+                    'rgba(234,179,8,0.6)',
+                    'rgba(59,130,246,0.6)',
+                    'rgba(168,85,247,0.6)',
+                ],
+                borderColor: [
+                    '#22c55e', '#eab308', '#3b82f6', '#a855f7',
+                ],
+                borderWidth: 2,
+                borderRadius: 6,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#475569',
+                    borderWidth: 1,
+                    titleColor: '#f1f5f9',
+                    bodyColor: '#94a3b8',
+                    padding: 12,
+                    callbacks: {
+                        label: (ctx) => formatMW(ctx.parsed.x) + ' MW'
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(71,85,105,0.3)' },
+                    ticks: { color: '#94a3b8', callback: v => formatMW(v) },
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { color: '#f1f5f9', font: { size: 12, weight: 600 } },
+                },
+            },
+        },
+    });
+}
+
+function updateBarChart(data) {
+    if (!data) return;
+    barChart.data.datasets[0].data = REGIONS.map(r => (data[r] && data[r].demand_mw) || 0);
+    barChart.update('none');
+}
+
+// ── Forecast Chart ──
+async function loadForecast() {
+    try {
+        const res = await fetch('/api/v1/electricity/predict?region=SE&hours=24&confidence=0.9');
+        const json = await res.json();
+        const predictions = json.predictions || [];
+
+        if (predictions.length === 0) {
+            showToast('No forecast data available', 'error');
+            return;
+        }
+
+        const labels = predictions.map(p => formatTimeLabel(p.timestamp));
+        const values = predictions.map(p => p.predicted_mw);
+        const upper = predictions.map(p => p.upper_bound);
+        const lower = predictions.map(p => p.lower_bound);
+
+        if (forecastChart) forecastChart.destroy();
+
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        forecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Forecast',
+                        data: values,
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168,85,247,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#a855f7',
+                        borderWidth: 2,
+                    },
+                    {
+                        label: 'Upper (90% CI)',
+                        data: upper,
+                        borderColor: 'rgba(34,197,94,0.4)',
+                        fill: '+1',
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                    },
+                    {
+                        label: 'Lower (90% CI)',
+                        data: lower,
+                        borderColor: 'rgba(239,68,68,0.4)',
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: '#94a3b8', usePointStyle: true, font: { size: 11 } } },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        borderColor: '#475569',
+                        borderWidth: 1,
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#94a3b8',
+                        padding: 12,
+                        callbacks: {
+                            label: (ctx) => `${ctx.dataset.label}: ${formatMW(ctx.parsed.y)} MW`
+                        }
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(71,85,105,0.3)' },
+                        ticks: { color: '#94a3b8', maxRotation: 45, maxTicksLimit: 12, font: { size: 10 } },
+                    },
+                    y: {
+                        grid: { color: 'rgba(71,85,105,0.3)' },
+                        ticks: { color: '#94a3b8', callback: v => formatMW(v) },
+                    },
+                },
+            },
+        });
+
+        showToast('24h forecast loaded!', 'success');
+    } catch (e) {
+        showToast('Forecast error: ' + e.message, 'error');
+    }
+}
+
+// ── Summary ──
+async function loadSummary() {
+    try {
+        const res = await fetch('/api/v1/electricity/summary');
+        const json = await res.json();
+
+        document.getElementById('statAvg').textContent = formatMW(json.avg_national_mw || 0);
+        document.getElementById('statPeak').textContent = formatMW(json.peak_national_mw || 0);
+
+        // Update peak values in gauge cards
+        if (json.regions) {
+            for (const r of REGIONS) {
+                if (json.regions[r]) {
+                    peakValues[r] = json.regions[r].peak_mw || 0;
+                    document.getElementById(`peakVal-${r}`).textContent = formatMW(peakValues[r]);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Summary load failed:', e);
+    }
+}
+
+// ── Table ──
+function updateTable(msg) {
+    const data = msg.data || {};
+    const row = {
+        tick: msg.tick,
+        timestamp: msg.timestamp,
+        N: (data.N && data.N.demand_mw) || 0,
+        NE: (data.NE && data.NE.demand_mw) || 0,
+        S: (data.S && data.S.demand_mw) || 0,
+        SE: (data.SE && data.SE.demand_mw) || 0,
+        total: msg.totals ? msg.totals.national_mw : 0,
+    };
+
+    tableHistory.unshift(row);
+    if (tableHistory.length > MAX_TABLE_ROWS) tableHistory.pop();
+
+    const tbody = document.getElementById('dataTableBody');
+    tbody.innerHTML = '';
+
+    for (const r of tableHistory) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="color:var(--text2);">${r.tick}</td>
+            <td>${formatTimeLabel(r.timestamp)}</td>
+            <td style="color:var(--region-n);">${formatMW(r.N)}</td>
+            <td style="color:var(--region-ne);">${formatMW(r.NE)}</td>
+            <td style="color:var(--region-s);">${formatMW(r.S)}</td>
+            <td style="color:var(--region-se);">${formatMW(r.SE)}</td>
+            <td style="font-weight:700;">${formatMW(r.total)}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
+// ── Formatters ──
+function formatMW(val) {
+    if (val == null || isNaN(val)) return '—';
+    if (val >= 1000) return (val / 1000).toFixed(1) + 'K';
+    return val.toFixed(1);
+}
+
+function formatTimeLabel(ts) {
+    if (!ts) return '—';
+    try {
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${d.getMonth()+1}/${d.getDate()} ${hh}:${mm}`;
+    } catch (e) {
+        return ts;
+    }
+}
+
+function formatDuration(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ── Toast ──
+function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast toast-' + (type || 'success') + ' show';
+    setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// ── Loading ──
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text || 'Loading...';
+    document.getElementById('loading').classList.add('active');
+}
+function hideLoading() {
+    document.getElementById('loading').classList.remove('active');
+}
+
+// ── Start ──
+init();
+</script>
+</body>
+</html>
