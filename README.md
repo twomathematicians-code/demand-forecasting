@@ -9,6 +9,7 @@
   <a href="#"><img src="https://img.shields.io/badge/LightGBM-4.3-4CAF50?style=for-the-badge" alt="LightGBM"></a>
   <a href="#"><img src="https://img.shields.io/badge/Prophet-1.1-0891b2?style=for-the-badge" alt="Prophet"></a>
   <a href="#"><img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"></a>
+  <a href="https://twomathematicians-code.github.io/demand-forecasting/electricity.html"><img src="https://img.shields.io/badge/⚡_Live_Dashboard-Online-22c55e?style=for-the-badge" alt="Live Dashboard"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"></a>
   <a href="#-testing"><img src="https://img.shields.io/badge/Tests-60_/60_passed-success?style=for-the-badge&logo=pytest" alt="Tests"></a>
   <a href="#-testing"><img src="https://img.shields.io/badge/Coverage-72%25-brightgreen?style=for-the-badge&logo=codecov" alt="Coverage"></a>
@@ -218,6 +219,22 @@ flowchart TD
 | `GET` | `/api/v1/dashboard/alerts` | Active unacknowledged alerts | None |
 | `WS` | `/ws/dashboard/{client_id}` | Real-time dashboard updates (Kafka + alerts) | None |
 | `WS` | `/ws/forecast/{product_id}` | Live per-product forecast stream | None |
+| `GET` | `/api/v1/electricity/data` | Historical electricity demand by region | None |
+| `GET` | `/api/v1/electricity/predict` | 24h electricity demand forecast with CIs | None |
+| `GET` | `/api/v1/electricity/summary` | Real-time KPIs per region (MW, peak, avg) | None |
+| `WS` | `/ws/electricity/live` | Live simulated electricity data stream | None |
+
+### ⚡ Live Electricity Dashboard
+
+**🌐 GitHub Pages:** [twomathematicians-code.github.io/demand-forecasting/electricity.html](https://twomathematicians-code.github.io/demand-forecasting/electricity.html)
+
+A real-time, auto-updating dashboard displaying Brazilian electricity demand data from the [Hourly Electricity Demand Brazil Dataset](https://huggingface.co/datasets/SamuelM0422/Hourly-Electricity-Demand-Brazil-Dataset) on HuggingFace.
+
+- **4 regions**: Norte, Nordeste, Sul, Sudeste — live gauges + streaming line chart
+- **24h forecast**: In-browser linear regression with confidence bands
+- **KPI cards**: National total, peak, average demand
+- **Regional comparison**: Bar chart + live data table
+- **Smart fallback**: Connects to Render API WebSocket first; if unavailable, loads data directly from HuggingFace Datasets Server API and simulates streaming
 
 ### Try It Live
 
@@ -385,7 +402,9 @@ demand-forecasting/
 │
 ├── 📂 src/
 │   ├── 📂 api/main.py              ⚡ FastAPI app — 5 endpoints, model lifespan
+│   ├── 📂 api/electricity_router.py ⚡ Electricity REST + WebSocket endpoints
 │   ├── 📂 data/loader.py           📥 CSV/Parquet + synthetic data generator
+│   ├── 📂 data/electricity_loader.py ⚡ HuggingFace electricity dataset loader
 │   ├── 📂 db/
 │   │   ├── session.py              🔌 asyncpg connection pool (2-10 connections)
 │   │   ├── queries.py              📝 20+ parameterized SQL query templates
@@ -437,6 +456,9 @@ demand-forecasting/
 │   └── test_websocket.py           (2 tests)
 │
 ├── 📂 docs/                        📚 Architecture PDF + SOP PDF + banner SVG
+│   └── electricity.html             ⚡ Live electricity dashboard (GitHub Pages)
+├── 📂 static/                        🌐 Static assets served by FastAPI
+│   └── electricity.html             ⚡ Electricity dashboard (Render-served version)
 ├── 📂 models/ensemble/             💾 Pre-trained fallback model artifacts
 ├── 📂 configs/
 │   ├── model_config.yaml           🎛️ All hyperparameters + quality gates
@@ -553,6 +575,12 @@ gantt
     Grafana Dashboards         :done, p3b, 2026-08, 2026-08
     Multi-Tenant Support       :done, p3c, 2026-08, 2026-08
     CI/CD Hardening            :done, p3d, 2026-08, 2026-08
+    
+    section Phase 4 ✅ Done
+    Electricity Dashboard      :done, p4a, 2026-08, 2026-08
+    HuggingFace Data Loading   :done, p4b, 2026-08, 2026-08
+    GitHub Pages Deployment    :done, p4c, 2026-08, 2026-08
+    Render Free-Tier Deploy    :done, p4d, 2026-08, 2026-08
 ```
 
 | Phase | Status | Features |
@@ -560,6 +588,7 @@ gantt
 | **Phase 1** | ✅ Complete | Real ML ensemble (4 models), database layer (6 tables), 36-feature engineering, 13-model config system, 31 tests |
 | **Phase 2** | ✅ Complete | CNN-LSTM PyTorch model, Kafka streaming, BI dashboard API (5 endpoints), Evidently AI drift monitoring, WebSocket real-time updates, 43 tests |
 | **Phase 3** | ✅ Complete | Redis caching, 3 Grafana dashboards, multi-tenant support, CI/CD hardening (matrix builds, Docker publish on tags) |
+| **Phase 4** | ✅ Complete | Live electricity dashboard, HuggingFace dataset integration, GitHub Pages deployment, Render free-tier hosting with smart API/HuggingFace fallback |
 
 ---
 
